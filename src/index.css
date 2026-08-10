@@ -1,0 +1,88 @@
+.glass-panel {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(10, 37, 64, 0.08);
+}
+
+.glass-panel-dark {
+  background: rgba(10, 37, 64, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(197, 168, 128, 0.15);
+}
+
+.luxury-shadow {
+  box-shadow: 0 20px 40px rgba(10, 37, 64, 0.06);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #C5A880 0%, #A88656 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-link {
+  position: relative;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #C5A880;
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover::after, .nav-link.active::after {
+  width: 100%;
+}
+
+/* Fade transitions */
+.fade-in-up {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom scrollbar for high-end look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F9F9F7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C5A880;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A88656;
+}
+
+html, body {
+  scroll-behavior: smooth;
+  font-family: 'Inter', -apple-system, sans-serif;
+  background-color: #F9F9F7;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Playfair Display', Georgia, serif;
+}
