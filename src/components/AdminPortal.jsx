@@ -169,6 +169,13 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   const [showCleanDbModal, setShowCleanDbModal] = useState(false);
   const [cleanDbTarget, setCleanDbTarget] = useState('dev'); // 'dev' or 'prod'
   const [cleanDbConfirmText, setCleanDbConfirmText] = useState('');
+  const [cleanDbCollections, setCleanDbCollections] = useState({
+    specialists: false,
+    users: false,
+    patients: false,
+    appointments: false,
+    auditLogs: false
+  });
 
   // Specialist management state variables
   const [showNewSpecModal, setShowNewSpecModal] = useState(false);
@@ -362,11 +369,29 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   const handleCleanDb = () => {
     setCleanDbConfirmText('');
     setCleanDbTarget('dev');
+    setCleanDbCollections({
+      specialists: false,
+      users: false,
+      patients: false,
+      appointments: false,
+      auditLogs: false
+    });
     setShowCleanDbModal(true);
   };
 
   const handleCleanDbSubmit = async (e) => {
     e.preventDefault();
+
+    const selectedAny = Object.values(cleanDbCollections).some(val => val);
+    if (!selectedAny) {
+      alert(
+        language === 'es'
+          ? 'Por favor, selecciona al menos una colección para limpiar.'
+          : 'Please select at least one collection to clear.'
+      );
+      return;
+    }
+
     const expectedText = cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO';
     if (cleanDbConfirmText.trim() !== expectedText) {
       alert(
@@ -378,7 +403,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     }
 
     try {
-      await cleanProductionDb(cleanDbTarget, currentUser);
+      await cleanProductionDb(cleanDbTarget, cleanDbCollections, currentUser);
       setShowCleanDbModal(false);
       alert(language === 'es' ? 'Limpieza de base de datos completada con éxito.' : 'Database cleanup completed successfully.');
     } catch (err) {
@@ -3205,6 +3230,73 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                       Live collections
                     </span>
                   </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                  {language === 'es' ? 'Seleccionar Colecciones a Limpiar' : 'Select Collections to Clear'} *
+                </label>
+                <div className="space-y-2.5 bg-white p-4 rounded-2xl border border-outline-variant/60">
+                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanDbCollections.specialists}
+                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, specialists: e.target.checked }))}
+                      className="rounded border-outline-variant text-error focus:ring-error"
+                    />
+                    <span>
+                      {language === 'es' ? 'Especialistas Clínicos' : 'Clinical Specialists'}
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanDbCollections.users}
+                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, users: e.target.checked }))}
+                      className="rounded border-outline-variant text-error focus:ring-error"
+                    />
+                    <span>
+                      {language === 'es' ? 'Usuarios del Sistema (excepto admin)' : 'System Users (except admin)'}
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanDbCollections.patients}
+                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, patients: e.target.checked }))}
+                      className="rounded border-outline-variant text-error focus:ring-error"
+                    />
+                    <span>
+                      {language === 'es' ? 'Pacientes Clínicos' : 'Clinical Patients'}
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanDbCollections.appointments}
+                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, appointments: e.target.checked }))}
+                      className="rounded border-outline-variant text-error focus:ring-error"
+                    />
+                    <span>
+                      {language === 'es' ? 'Citas Agendadas' : 'Scheduled Appointments'}
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cleanDbCollections.auditLogs}
+                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, auditLogs: e.target.checked }))}
+                      className="rounded border-outline-variant text-error focus:ring-error"
+                    />
+                    <span>
+                      {language === 'es' ? 'Historial de Auditoría' : 'Audit Log History'}
+                    </span>
+                  </label>
                 </div>
               </div>
 

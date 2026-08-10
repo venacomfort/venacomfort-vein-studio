@@ -964,35 +964,74 @@ export const DataProvider = ({ children }) => {
     setUsers(prev => prev.filter(u => u.id !== userId));
   };
 
-  const cleanProductionDb = async (targetEnv, currentUser) => {
+  const cleanProductionDb = async (targetEnv, options, currentUser) => {
     try {
       const targetPrefix = targetEnv === 'prod' ? '' : '_dev';
-
-      // Clean Specialists
-      const specSnap = await getDocs(collection(db, `specialists${targetPrefix}`));
-      for (const d of specSnap.docs) {
-        await deleteDoc(doc(db, `specialists${targetPrefix}`, d.id));
-      }
-      
-      // Clean Users
-      const userSnap = await getDocs(collection(db, `users${targetPrefix}`));
-      for (const d of userSnap.docs) {
-        const data = d.data();
-        if (data.email?.toLowerCase() === 'admin@venacomfort.com') {
-          continue;
-        }
-        await deleteDoc(doc(db, `users${targetPrefix}`, d.id));
-      }
-
-      // Check if targetPrefix matches active app prefix to sync React state
       const isActiveDev = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
       const activePrefix = isActiveDev ? '_dev' : '';
-      if (targetPrefix === activePrefix) {
-        setSpecialists([]);
-        setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
+      const isTargetActive = targetPrefix === activePrefix;
+
+      // 1. Clean Specialists
+      if (options.specialists) {
+        const specSnap = await getDocs(collection(db, `specialists${targetPrefix}`));
+        for (const d of specSnap.docs) {
+          await deleteDoc(doc(db, `specialists${targetPrefix}`, d.id));
+        }
+        if (isTargetActive) {
+          setSpecialists([]);
+        }
       }
 
-      logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron todos los especialistas y usuarios no-admin de la base de datos (${targetEnv.toUpperCase()}).`);
+      // 2. Clean Users
+      if (options.users) {
+        const userSnap = await getDocs(collection(db, `users${targetPrefix}`));
+        for (const d of userSnap.docs) {
+          const data = d.data();
+          if (data.email?.toLowerCase() === 'admin@venacomfort.com') {
+            continue;
+          }
+          await deleteDoc(doc(db, `users${targetPrefix}`, d.id));
+        }
+        if (isTargetActive) {
+          setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
+        }
+      }
+
+      // 3. Clean Patients
+      if (options.patients) {
+        const patSnap = await getDocs(collection(db, `patients${targetPrefix}`));
+        for (const d of patSnap.docs) {
+          await deleteDoc(doc(db, `patients${targetPrefix}`, d.id));
+        }
+        if (isTargetActive) {
+          setPatients([]);
+        }
+      }
+
+      // 4. Clean Appointments
+      if (options.appointments) {
+        const appSnap = await getDocs(collection(db, `appointments${targetPrefix}`));
+        for (const d of appSnap.docs) {
+          await deleteDoc(doc(db, `appointments${targetPrefix}`, d.id));
+        }
+        if (isTargetActive) {
+          setAppointments([]);
+        }
+      }
+
+      // 5. Clean Audit Logs
+      if (options.auditLogs) {
+        const logSnap = await getDocs(collection(db, `audit_logs${targetPrefix}`));
+        for (const d of logSnap.docs) {
+          await deleteDoc(doc(db, `audit_logs${targetPrefix}`, d.id));
+        }
+        if (isTargetActive) {
+          setAuditLogs([]);
+        }
+      }
+
+      const collectionsCleaned = Object.keys(options).filter(k => options[k]).join(', ');
+      logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron datos de las colecciones (${collectionsCleaned}) en el entorno ${targetEnv.toUpperCase()}.`);
       return true;
     } catch (e) {
       console.error("cleanProductionDb error:", e);
