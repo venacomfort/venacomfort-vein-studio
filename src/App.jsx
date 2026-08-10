@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from './context/LanguageContext';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -13,6 +13,19 @@ export default function App() {
   const [view, setView] = useState('landing'); // 'landing' or 'admin'
   const [bookingOpen, setBookingOpen] = useState(false);
   const [adminSubView, setAdminSubView] = useState('patients'); // 'patients' or 'specialists'
+
+  // Clear session storage on fresh navigation (tab/window close and reopen)
+  useEffect(() => {
+    try {
+      const navigationEntry = performance.getEntriesByType('navigation')[0];
+      if (navigationEntry && navigationEntry.type === 'navigate') {
+        sessionStorage.removeItem('venacomfort_auth');
+        sessionStorage.removeItem('venacomfort_user');
+      }
+    } catch (e) {
+      console.warn("Performance Navigation API not supported:", e);
+    }
+  }, []);
   const [bookingService, setBookingService] = useState('Sclerotherapy');
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('venacomfort_auth') === 'true';
