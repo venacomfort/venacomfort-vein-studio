@@ -825,24 +825,22 @@ export const DataProvider = ({ children }) => {
       if (s.id === specId) {
         const updated = { ...s, ...updatedInfo };
         saveSpecialistToCloud(updated);
-
-        // Sync to users
-        setUsers(prevUsers => prevUsers.map(u => {
-          if (u.specialistId === specId) {
-            const updatedUser = {
-              ...u,
-              name: updatedInfo.name || u.name,
-              email: updatedInfo.email || u.email
-            };
-            saveUserToCloud(updatedUser);
-            return updatedUser;
-          }
-          return u;
-        }));
-
         return updated;
       }
       return s;
+    }));
+
+    setUsers(prevUsers => prevUsers.map(u => {
+      if (u.specialistId === specId) {
+        const updatedUser = {
+          ...u,
+          name: updatedInfo.name || u.name,
+          email: updatedInfo.email || u.email
+        };
+        saveUserToCloud(updatedUser);
+        return updatedUser;
+      }
+      return u;
     }));
   };
 
@@ -866,8 +864,6 @@ export const DataProvider = ({ children }) => {
       id: newId,
       ...userData
     };
-    setUsers(prev => [...prev, newUser]);
-    saveUserToCloud(newUser);
 
     if (userData.role === 'specialist') {
       const specId = `doc-${Date.now()}`;
@@ -887,13 +883,18 @@ export const DataProvider = ({ children }) => {
       saveSpecialistToCloud(newSpec);
 
       newUser.specialistId = specId;
-      saveUserToCloud(newUser);
-      setUsers(prev => prev.map(u => u.id === newId ? newUser : u));
     }
+
+    setUsers(prev => [...prev, newUser]);
+    saveUserToCloud(newUser);
     return newUser;
   };
 
   const updateUser = (userId, updatedData) => {
+    let specToUpdate = null;
+    let specToDeleteId = null;
+    let specToAdd = null;
+
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
         const oldRole = u.role;
@@ -903,7 +904,7 @@ export const DataProvider = ({ children }) => {
         if (updated.role === 'specialist') {
           if (!updated.specialistId) {
             const specId = `doc-${Date.now()}`;
-            const newSpec = {
+            specToAdd = {
               id: specId,
               name: updated.name,
               email: updated.email,
@@ -915,28 +916,18 @@ export const DataProvider = ({ children }) => {
               image: '',
               status: 'Active'
             };
-            setSpecialists(prev => [...prev, newSpec]);
-            saveSpecialistToCloud(newSpec);
             updated.specialistId = specId;
             saveUserToCloud(updated);
           } else {
-            setSpecialists(prevSpecs => prevSpecs.map(s => {
-              if (s.id === updated.specialistId) {
-                const updatedSpec = {
-                  ...s,
-                  name: updated.name,
-                  email: updated.email
-                };
-                saveSpecialistToCloud(updatedSpec);
-                return updatedSpec;
-              }
-              return s;
-            }));
+            specToUpdate = {
+              id: updated.specialistId,
+              name: updated.name,
+              email: updated.email
+            };
           }
         } else if (oldRole === 'specialist' && updated.role === 'admin') {
           if (u.specialistId) {
-            setSpecialists(prevSpecs => prevSpecs.filter(s => s.id !== u.specialistId));
-            deleteSpecialistFromCloud(u.specialistId);
+            specToDeleteId = u.specialistId;
             delete updated.specialistId;
             saveUserToCloud(updated);
           }
@@ -946,6 +937,25 @@ export const DataProvider = ({ children }) => {
       }
       return u;
     }));
+
+    if (specToAdd) {
+      setSpecialists(prev => [...prev, specToAdd]);
+      saveSpecialistToCloud(specToAdd);
+    }
+    if (specToUpdate) {
+      setSpecialists(prev => prev.map(s => {
+        if (s.id === specToUpdate.id) {
+          const updatedSpec = { ...s, name: specToUpdate.name, email: specToUpdate.email };
+          saveSpecialistToCloud(updatedSpec);
+          return updatedSpec;
+        }
+        return s;
+      }));
+    }
+    if (specToDeleteId) {
+      setSpecialists(prev => prev.filter(s => s.id !== specToDeleteId));
+      deleteSpecialistFromCloud(specToDeleteId);
+    }
   };
 
   const deleteUser = (userId) => {
