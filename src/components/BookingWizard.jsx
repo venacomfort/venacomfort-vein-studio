@@ -228,7 +228,7 @@ export default function BookingWizard({ onClose }) {
         {/* Header */}
         <header className="bg-white px-6 py-5 border-b border-champagne-gold/15 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2 text-deep-cobalt">
-            <span className="material-symbols-outlined text-champagne-gold text-2xl">home_health</span>
+            <img src="/logo.png" alt="VenaComfort Logo" className="h-6 w-6 object-contain" />
             <span className="font-display text-xl font-bold">VenaComfort</span>
           </div>
           <button 

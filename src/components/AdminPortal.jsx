@@ -485,7 +485,7 @@ export default function AdminPortal() {
 
         <div className="w-full max-w-md glass-panel p-8 rounded-3xl shadow-xl bg-white border border-champagne-gold/15 relative z-10 text-center">
           <div className="flex justify-center items-center gap-2 mb-6">
-            <span className="material-symbols-outlined text-champagne-gold text-4xl">home_health</span>
+            <img src="/logo.png" alt="VenaComfort Logo" className="h-10 w-10 object-contain" />
             <span className="font-display text-2xl font-bold text-deep-cobalt">VenaComfort</span>
           </div>
 
@@ -1586,7 +1586,7 @@ export default function AdminPortal() {
           {/* Letterhead Header */}
           <div className="flex justify-between items-center border-b-2 border-champagne-gold pb-6">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-champagne-gold text-4xl">home_health</span>
+              <img src="/logo.png" alt="VenaComfort Logo" className="h-10 w-10 object-contain" />
               <div>
                 <h1 className="font-display text-3xl font-bold tracking-tight text-deep-cobalt">VenaComfort</h1>
                 <span className="text-[10px] uppercase font-bold tracking-widest text-champagne-gold">Vein Studio & Aesthetic Care</span>

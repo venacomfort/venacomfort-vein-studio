@@ -20,7 +20,7 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
         <div className="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop flex justify-between items-center h-20">
           {/* Logo / Brand */}
           <button onClick={() => setView('landing')} className="flex items-center gap-2 group focus:outline-none">
-            <span className="material-symbols-outlined text-champagne-gold text-3xl group-hover:scale-110 transition-transform duration-300">home_health</span>
+            <img src="/logo.png" alt="VenaComfort Logo" className="h-9 w-9 object-contain group-hover:scale-110 transition-transform duration-300" />
             <span className="font-display text-2xl text-primary tracking-tight font-bold">VenaComfort</span>
           </button>
 

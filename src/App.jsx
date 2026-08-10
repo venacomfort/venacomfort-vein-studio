@@ -31,7 +31,7 @@ export default function App() {
         {/* Navigation Drawer for Admin */}
         <aside className="bg-soft-ivory h-full w-72 rounded-r-xl bg-surface-container-lowest shadow-xl flex flex-col py-6 shrink-0 z-40 hidden md:flex border-r border-champagne-gold/15">
           <div className="px-6 mb-8 flex items-center gap-2">
-            <span className="material-symbols-outlined text-champagne-gold text-2xl">home_health</span>
+            <img src="/logo.png" alt="VenaComfort Logo" className="h-6 w-6 object-contain" />
             <span className="font-display text-xl font-bold text-deep-cobalt">VenaComfort</span>
           </div>
           <nav className="flex-grow space-y-2 px-2 overflow-y-auto">
@@ -110,6 +110,7 @@ export default function App() {
         <section className="py-24 md:py-32 bg-soft-ivory" id="faq">
           <div className="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop">
             <div className="text-center max-w-3xl mx-auto mb-16">
+              <img src="/logo.png" alt="FAQ Logo" className="h-12 w-12 mx-auto mb-4 object-contain opacity-80 animate-fade-in" />
               <h2 className="font-display text-3xl md:text-4xl text-deep-cobalt mb-6 font-bold">
                 {t('faqTitle')}
               </h2>
@@ -125,7 +126,8 @@ export default function App() {
                       onClick={() => toggleFaq(index)}
                       className="w-full px-6 py-5 flex justify-between items-center text-left hover:bg-champagne-gold/[0.02] transition-colors focus:outline-none cursor-pointer"
                     >
-                      <span className="font-display text-base md:text-lg text-deep-cobalt font-semibold">
+                      <span className="font-display text-base md:text-lg text-deep-cobalt font-semibold flex items-center gap-2.5">
+                        <img src="/logo.png" alt="FAQ Icon" className="h-5 w-5 object-contain shrink-0 opacity-70" />
                         {t(faq.qKey)}
                       </span>
                       <span className={`material-symbols-outlined text-champagne-gold transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
@@ -180,7 +182,7 @@ export default function App() {
           {/* Logo & Brand */}
           <div className="flex flex-col gap-4 md:w-1/3">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-soft-ivory text-3xl">home_health</span>
+              <img src="/logo.png" alt="VenaComfort Logo" className="h-8 w-8 object-contain brightness-0 invert" />
               <span className="font-display text-2xl text-soft-ivory font-bold">VenaComfort</span>
             </div>
             <p className="text-sm text-surface-container-highest/80 max-w-sm leading-relaxed">

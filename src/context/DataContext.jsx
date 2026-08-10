@@ -1,4 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { db } from "../firebase";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 
 const DataContext = createContext();
 
@@ -160,6 +162,58 @@ export const DataProvider = ({ children }) => {
     return apps;
   });
 
+  // Sync cloud database on mount (load and seed if empty)
+  useEffect(() => {
+    const loadCloudData = async () => {
+      try {
+        const patientSnap = await getDocs(collection(db, "patients"));
+        const appSnap = await getDocs(collection(db, "appointments"));
+        
+        if (patientSnap.empty) {
+          // Seed patients
+          const seedPromises = initialPatients.map(p => {
+            return setDoc(doc(db, "patients", p.id), p);
+          });
+          
+          // Seed appointments
+          const apps = [];
+          initialPatients.forEach(p => {
+            p.appointments.forEach(app => {
+              const a = {
+                ...app,
+                patientId: p.id,
+                patientName: `${p.firstName} ${p.lastName}`
+              };
+              apps.push(a);
+              seedPromises.push(setDoc(doc(db, "appointments", a.id), a));
+            });
+          });
+          
+          await Promise.all(seedPromises);
+          console.log("Cloud Firestore seeded with default clinic data successfully!");
+        } else {
+          const cloudPatients = [];
+          patientSnap.forEach(d => {
+            cloudPatients.push(d.data());
+          });
+          
+          const cloudApps = [];
+          appSnap.forEach(d => {
+            cloudApps.push(d.data());
+          });
+          
+          setPatients(cloudPatients);
+          setAppointments(cloudApps);
+          console.log("Cloud Firestore patients and appointments loaded successfully!");
+        }
+      } catch (error) {
+        console.error("Firestore initialization or load error:", error);
+      }
+    };
+    loadCloudData();
+  }, []);
+
+  // Sync to local storage as safety cache
   useEffect(() => {
     try {
       localStorage.setItem('venacomfort_patients', JSON.stringify(patients));
@@ -178,6 +232,31 @@ export const DataProvider = ({ children }) => {
       console.error("Local storage appts sync error:", e);
     }
   }, [appointments]);
+
+  // Firestore background helper functions
+  const savePatientToCloud = async (patient) => {
+    try {
+      await setDoc(doc(db, "patients", patient.id), patient);
+    } catch (error) {
+      console.error("Firestore savePatientToCloud error:", error);
+    }
+  };
+
+  const saveAppToCloud = async (app) => {
+    try {
+      await setDoc(doc(db, "appointments", app.id), app);
+    } catch (error) {
+      console.error("Firestore saveAppToCloud error:", error);
+    }
+  };
+
+  const deleteAppFromCloud = async (appId) => {
+    try {
+      await deleteDoc(doc(db, "appointments", appId));
+    } catch (error) {
+      console.error("Firestore deleteAppFromCloud error:", error);
+    }
+  };
 
   // Add Appointment (from wizard)
   const addAppointment = (patientData, bookingDetails) => {
@@ -233,20 +312,19 @@ export const DataProvider = ({ children }) => {
         appointments: [newApp]
       };
       setPatients(prev => [...prev, newPatient]);
+      savePatientToCloud(newPatient);
     } else {
       // Append appointment to existing patient
-      setPatients(prev => prev.map(p => {
-        if (p.id === patientId) {
-          return {
-            ...p,
-            appointments: [...p.appointments, newApp]
-          };
-        }
-        return p;
-      }));
+      const updatedPatient = {
+        ...patient,
+        appointments: [...patient.appointments, newApp]
+      };
+      setPatients(prev => prev.map(p => p.id === patientId ? updatedPatient : p));
+      savePatientToCloud(updatedPatient);
     }
 
     setAppointments(prev => [...prev, newApp]);
+    saveAppToCloud(newApp);
     return newApp;
   };
 
@@ -275,6 +353,7 @@ export const DataProvider = ({ children }) => {
       appointments: []
     };
     setPatients(prev => [...prev, newPatient]);
+    savePatientToCloud(newPatient);
     return newPatient;
   };
 
@@ -288,10 +367,12 @@ export const DataProvider = ({ children }) => {
 
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           soapNotes: [newNote, ...p.soapNotes]
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -301,10 +382,12 @@ export const DataProvider = ({ children }) => {
   const updateSoapNote = (patientId, noteId, updatedNoteData) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           soapNotes: p.soapNotes.map(n => n.id === noteId ? { ...n, ...updatedNoteData } : n)
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -314,11 +397,13 @@ export const DataProvider = ({ children }) => {
   const saveConsentSignature = (patientId, signatureBase64) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           consentSigned: true,
           consentSignatureUrl: signatureBase64
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -328,12 +413,14 @@ export const DataProvider = ({ children }) => {
   const saveSocialMediaConsent = (patientId, signatureBase64, consentLevel) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           socialMediaConsentSigned: true,
           socialMediaConsentLevel: consentLevel,
           socialMediaSignatureUrl: signatureBase64
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -350,10 +437,12 @@ export const DataProvider = ({ children }) => {
 
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           photos: [...p.photos, newPhoto]
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -363,10 +452,12 @@ export const DataProvider = ({ children }) => {
   const updatePatient = (patientId, updatedData) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        return {
+        const updated = {
           ...p,
           ...updatedData
         };
+        savePatientToCloud(updated);
+        return updated;
       }
       return p;
     }));
@@ -375,10 +466,15 @@ export const DataProvider = ({ children }) => {
   // Delete appointment
   const deleteAppointment = (appId) => {
     setAppointments(prev => prev.filter(app => app.id !== appId));
-    setPatients(prev => prev.map(p => ({
-      ...p,
-      appointments: p.appointments.filter(app => app.id !== appId)
-    })));
+    deleteAppFromCloud(appId);
+    setPatients(prev => prev.map(p => {
+      const updated = {
+        ...p,
+        appointments: p.appointments.filter(app => app.id !== appId)
+      };
+      savePatientToCloud(updated);
+      return updated;
+    }));
   };
 
   return (
