@@ -17,6 +17,11 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('venacomfort_auth') === 'true';
   });
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = sessionStorage.getItem('venacomfort_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [faqOpen, setFaqOpen] = useState(null);
 
   const handleOpenBooking = (service = 'Sclerotherapy') => {
@@ -88,24 +93,96 @@ export default function App() {
                 <span>{language === 'es' ? 'Portal Clínico' : 'Clinical Portal'}</span>
               </button>
 
-              {isAuthenticated && (
-                <button 
-                  onClick={() => setAdminSubView('specialists')}
-                  className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
-                    adminSubView === 'specialists' 
-                      ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
-                      : 'text-on-surface-variant hover:bg-champagne-gold/10'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-lg">groups</span>
-                  <span>{language === 'es' ? 'Especialistas' : 'Specialists'}</span>
-                </button>
+              {isAuthenticated && currentUser?.role === 'admin' && (
+                <>
+                  <button 
+                    onClick={() => setAdminSubView('specialists')}
+                    className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
+                      adminSubView === 'specialists' 
+                        ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
+                        : 'text-on-surface-variant hover:bg-champagne-gold/10'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">groups</span>
+                    <span>{language === 'es' ? 'Especialistas' : 'Specialists'}</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setAdminSubView('users')}
+                    className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
+                      adminSubView === 'users' 
+                        ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
+                        : 'text-on-surface-variant hover:bg-champagne-gold/10'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">manage_accounts</span>
+                    <span>{language === 'es' ? 'Usuarios' : 'Users'}</span>
+                  </button>
+                </>
               )}
             </div>
           </nav>
-          <div className="p-4 border-t border-surface-container-high text-center">
-            <span className="text-[10px] text-on-surface-variant/80 font-bold uppercase tracking-wider block">VenaComfort CRM</span>
-            <span className="text-[9px] text-on-surface-variant/60 block mt-0.5">v1.0.0 • HIPAA Secure</span>
+          
+          <div className="p-4 border-t border-surface-container-high relative">
+            {isAuthenticated && currentUser ? (
+              <div className="flex flex-col">
+                {/* Dropdown Menu */}
+                {showUserMenu && (
+                  <div className="absolute bottom-16 left-4 right-4 bg-white border border-outline-variant/60 rounded-2xl shadow-xl p-2 z-50 flex flex-col gap-1 text-left animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <button
+                      onClick={() => {
+                        setAdminSubView('audit_logs');
+                        setShowUserMenu(false);
+                      }}
+                      className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-champagne-gold/10 cursor-pointer w-full text-left transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-base">history</span>
+                      <span>{language === 'es' ? 'Registro de Acciones' : 'Action Logs'}</span>
+                    </button>
+                    <hr className="border-ice-blue/50 my-1" />
+                    <button
+                      onClick={() => {
+                        setIsAuthenticated(false);
+                        setCurrentUser(null);
+                        sessionStorage.removeItem('venacomfort_auth');
+                        sessionStorage.removeItem('venacomfort_user');
+                        setShowUserMenu(false);
+                      }}
+                      className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-bold text-error hover:bg-error-container/20 cursor-pointer w-full text-left transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-base">logout</span>
+                      <span>{language === 'es' ? 'Cerrar Sesión' : 'Logout'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* User Info Anchor Button */}
+                <button
+                  onClick={() => setShowUserMenu(prev => !prev)}
+                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-champagne-gold/10 border border-transparent hover:border-champagne-gold/15 transition-all text-left w-full cursor-pointer"
+                >
+                  <div className="h-10 w-10 rounded-full bg-deep-cobalt text-white flex items-center justify-center font-display font-bold text-sm tracking-wide shrink-0 shadow-inner overflow-hidden">
+                    {currentUser.role === 'specialist' ? (
+                      <span className="material-symbols-outlined text-lg">medical_services</span>
+                    ) : (
+                      <span>{currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-grow">
+                    <span className="block text-xs font-bold text-deep-cobalt truncate leading-tight">{currentUser.name}</span>
+                    <span className="block text-[10px] text-on-surface-variant/70 font-semibold uppercase tracking-wider mt-0.5">
+                      {currentUser.role === 'admin' ? (language === 'es' ? 'Administrador' : 'Admin') : (language === 'es' ? 'Especialista' : 'Specialist')}
+                    </span>
+                  </div>
+                  <span className="material-symbols-outlined text-sm text-on-surface-variant/60 shrink-0">unfold_more</span>
+                </button>
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <span className="text-[10px] text-on-surface-variant/80 font-bold uppercase tracking-wider block">VenaComfort CRM</span>
+                <span className="text-[9px] text-on-surface-variant/60 block mt-0.5">v1.0.0 • HIPAA Secure</span>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -115,6 +192,8 @@ export default function App() {
           setAdminSubView={setAdminSubView} 
           isAuthenticated={isAuthenticated} 
           setIsAuthenticated={setIsAuthenticated} 
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
         />
       </div>
     );

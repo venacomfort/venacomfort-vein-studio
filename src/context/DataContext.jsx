@@ -159,6 +159,8 @@ const isProd = import.meta.env.PROD || window.location.hostname !== 'localhost';
 const COLL_PATIENTS = isProd ? "patients" : "patients_dev";
 const COLL_APPOINTMENTS = isProd ? "appointments" : "appointments_dev";
 const COLL_SPECIALISTS = isProd ? "specialists" : "specialists_dev";
+const COLL_USERS = isProd ? "users" : "users_dev";
+const COLL_AUDIT_LOGS = isProd ? "audit_logs" : "audit_logs_dev";
 
 export const DataProvider = ({ children }) => {
   const [patients, setPatients] = useState(() => {
@@ -189,6 +191,23 @@ export const DataProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : defaultSpecialists;
   });
 
+  const [users, setUsers] = useState(() => {
+    const saved = localStorage.getItem(isProd ? 'venacomfort_users' : 'venacomfort_users_dev');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: 'user-admin', name: 'Clinical Administrator', email: 'admin@venacomfort.com', password: 'ComfortVeins2026!', role: 'admin' },
+      { id: 'user-doc-1', name: 'Dr. Elena Rodriguez', email: 'elena.rodriguez@venacomfort.com', password: 'ElenaRodriguez2026!', role: 'specialist', specialistId: 'doc-1' }
+    ];
+  });
+
+  const [auditLogs, setAuditLogs] = useState(() => {
+    const saved = localStorage.getItem(isProd ? 'venacomfort_audit_logs' : 'venacomfort_audit_logs_dev');
+    if (saved) return JSON.parse(saved);
+    return [
+      { id: 'log-1', timestamp: new Date().toISOString(), user: 'System', action: 'System Initialization', details: 'VenaComfort CRM initial state loaded.' }
+    ];
+  });
+
   // Sync cloud database on mount (load and seed if empty)
   useEffect(() => {
     const loadCloudData = async () => {
@@ -196,6 +215,8 @@ export const DataProvider = ({ children }) => {
         const patientSnap = await getDocs(collection(db, COLL_PATIENTS));
         const appSnap = await getDocs(collection(db, COLL_APPOINTMENTS));
         const specSnap = await getDocs(collection(db, COLL_SPECIALISTS));
+        const userSnap = await getDocs(collection(db, COLL_USERS));
+        const logSnap = await getDocs(collection(db, COLL_AUDIT_LOGS));
         
         if (patientSnap.empty) {
           if (!isProd) {
@@ -259,6 +280,43 @@ export const DataProvider = ({ children }) => {
           setSpecialists(cloudSpecs);
           console.log("Cloud Firestore specialists loaded successfully!");
         }
+
+        // Load or seed users
+        if (userSnap.empty) {
+          const defaultUsers = [
+            { id: 'user-admin', name: 'Clinical Administrator', email: 'admin@venacomfort.com', password: 'ComfortVeins2026!', role: 'admin' },
+            { id: 'user-doc-1', name: 'Dr. Elena Rodriguez', email: 'elena.rodriguez@venacomfort.com', password: 'ElenaRodriguez2026!', role: 'specialist', specialistId: 'doc-1' }
+          ];
+          const promises = defaultUsers.map(u => setDoc(doc(db, COLL_USERS, u.id), u));
+          await Promise.all(promises);
+          setUsers(defaultUsers);
+          console.log("Cloud Firestore users seeded successfully!");
+        } else {
+          const cloudUsers = [];
+          userSnap.forEach(d => {
+            cloudUsers.push(d.data());
+          });
+          setUsers(cloudUsers);
+          console.log("Cloud Firestore users loaded successfully!");
+        }
+
+        // Load or seed audit logs
+        if (logSnap.empty) {
+          const initialLogs = [
+            { id: 'log-1', timestamp: new Date().toISOString(), user: 'System', action: 'System Initialization', details: 'VenaComfort CRM initial state loaded.' }
+          ];
+          await setDoc(doc(db, COLL_AUDIT_LOGS, initialLogs[0].id), initialLogs[0]);
+          setAuditLogs(initialLogs);
+          console.log("Cloud Firestore audit logs seeded successfully!");
+        } else {
+          const cloudLogs = [];
+          logSnap.forEach(d => {
+            cloudLogs.push(d.data());
+          });
+          cloudLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          setAuditLogs(cloudLogs);
+          console.log("Cloud Firestore audit logs loaded successfully!");
+        }
       } catch (error) {
         console.error("Firestore initialization or load error:", error);
       }
@@ -293,6 +351,22 @@ export const DataProvider = ({ children }) => {
       console.error("Local storage specialists sync error:", e);
     }
   }, [specialists]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(isProd ? 'venacomfort_users' : 'venacomfort_users_dev', JSON.stringify(users));
+    } catch (e) {
+      console.error("Local storage users sync error:", e);
+    }
+  }, [users]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(isProd ? 'venacomfort_audit_logs' : 'venacomfort_audit_logs_dev', JSON.stringify(auditLogs));
+    } catch (e) {
+      console.error("Local storage audit logs sync error:", e);
+    }
+  }, [auditLogs]);
 
   // Firestore background helper functions
   const savePatientToCloud = async (patient) => {
@@ -332,6 +406,30 @@ export const DataProvider = ({ children }) => {
       await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
     } catch (error) {
       console.error("Firestore deleteSpecialistFromCloud error:", error);
+    }
+  };
+
+  const saveUserToCloud = async (userData) => {
+    try {
+      await setDoc(doc(db, COLL_USERS, userData.id), userData);
+    } catch (e) {
+      console.error("Firestore saveUserToCloud error:", e);
+    }
+  };
+
+  const deleteUserFromCloud = async (userId) => {
+    try {
+      await deleteDoc(doc(db, COLL_USERS, userId));
+    } catch (e) {
+      console.error("Firestore deleteUserFromCloud error:", e);
+    }
+  };
+
+  const saveAuditLogToCloud = async (logData) => {
+    try {
+      await setDoc(doc(db, COLL_AUDIT_LOGS, logData.id), logData);
+    } catch (e) {
+      console.error("Firestore saveAuditLogToCloud error:", e);
     }
   };
 
@@ -702,6 +800,22 @@ export const DataProvider = ({ children }) => {
     };
     setSpecialists(prev => [...prev, newSpec]);
     saveSpecialistToCloud(newSpec);
+
+    // Sync to users: check if user exists
+    const userEmail = specInfo.email.toLowerCase();
+    const existingUser = users.find(u => u.email.toLowerCase() === userEmail);
+    if (!existingUser) {
+      const newUser = {
+        id: `user-${newId}`,
+        name: specInfo.name,
+        email: specInfo.email,
+        password: `${specInfo.name.replace(/\s+/g, '')}2026!`,
+        role: 'specialist',
+        specialistId: newId
+      };
+      setUsers(prev => [...prev, newUser]);
+      saveUserToCloud(newUser);
+    }
     return newSpec;
   };
 
@@ -711,6 +825,21 @@ export const DataProvider = ({ children }) => {
       if (s.id === specId) {
         const updated = { ...s, ...updatedInfo };
         saveSpecialistToCloud(updated);
+
+        // Sync to users
+        setUsers(prevUsers => prevUsers.map(u => {
+          if (u.specialistId === specId) {
+            const updatedUser = {
+              ...u,
+              name: updatedInfo.name || u.name,
+              email: updatedInfo.email || u.email
+            };
+            saveUserToCloud(updatedUser);
+            return updatedUser;
+          }
+          return u;
+        }));
+
         return updated;
       }
       return s;
@@ -721,6 +850,126 @@ export const DataProvider = ({ children }) => {
   const deleteSpecialist = (specId) => {
     setSpecialists(prev => prev.filter(s => s.id !== specId));
     deleteSpecialistFromCloud(specId);
+
+    // Sync to users
+    const linkedUser = users.find(u => u.specialistId === specId);
+    if (linkedUser) {
+      setUsers(prev => prev.filter(u => u.id !== linkedUser.id));
+      deleteUserFromCloud(linkedUser.id);
+    }
+  };
+
+  // User Management
+  const addUser = (userData) => {
+    const newId = `user-${Date.now()}`;
+    const newUser = {
+      id: newId,
+      ...userData
+    };
+    setUsers(prev => [...prev, newUser]);
+    saveUserToCloud(newUser);
+
+    if (userData.role === 'specialist') {
+      const specId = `doc-${Date.now()}`;
+      const newSpec = {
+        id: specId,
+        name: userData.name,
+        email: userData.email,
+        phone: '786-555-0100',
+        title: 'Specialist',
+        titleEs: 'Especialista',
+        schedule: 'Mon - Fri',
+        scheduleEs: 'Lun - Vie',
+        image: '',
+        status: 'Active'
+      };
+      setSpecialists(prev => [...prev, newSpec]);
+      saveSpecialistToCloud(newSpec);
+
+      newUser.specialistId = specId;
+      saveUserToCloud(newUser);
+      setUsers(prev => prev.map(u => u.id === newId ? newUser : u));
+    }
+    return newUser;
+  };
+
+  const updateUser = (userId, updatedData) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        const oldRole = u.role;
+        const updated = { ...u, ...updatedData };
+        saveUserToCloud(updated);
+
+        if (updated.role === 'specialist') {
+          if (!updated.specialistId) {
+            const specId = `doc-${Date.now()}`;
+            const newSpec = {
+              id: specId,
+              name: updated.name,
+              email: updated.email,
+              phone: '786-555-0100',
+              title: 'Specialist',
+              titleEs: 'Especialista',
+              schedule: 'Mon - Fri',
+              scheduleEs: 'Lun - Vie',
+              image: '',
+              status: 'Active'
+            };
+            setSpecialists(prev => [...prev, newSpec]);
+            saveSpecialistToCloud(newSpec);
+            updated.specialistId = specId;
+            saveUserToCloud(updated);
+          } else {
+            setSpecialists(prevSpecs => prevSpecs.map(s => {
+              if (s.id === updated.specialistId) {
+                const updatedSpec = {
+                  ...s,
+                  name: updated.name,
+                  email: updated.email
+                };
+                saveSpecialistToCloud(updatedSpec);
+                return updatedSpec;
+              }
+              return s;
+            }));
+          }
+        } else if (oldRole === 'specialist' && updated.role === 'admin') {
+          if (u.specialistId) {
+            setSpecialists(prevSpecs => prevSpecs.filter(s => s.id !== u.specialistId));
+            deleteSpecialistFromCloud(u.specialistId);
+            delete updated.specialistId;
+            saveUserToCloud(updated);
+          }
+        }
+
+        return updated;
+      }
+      return u;
+    }));
+  };
+
+  const deleteUser = (userId) => {
+    const user = users.find(u => u.id === userId);
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    deleteUserFromCloud(userId);
+
+    if (user && user.specialistId) {
+      setSpecialists(prev => prev.filter(s => s.id !== user.specialistId));
+      deleteSpecialistFromCloud(user.specialistId);
+    }
+  };
+
+  // Audit Action Logger
+  const logAction = (userName, action, details) => {
+    const newLog = {
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toISOString(),
+      user: userName || 'System',
+      action,
+      details: details || ''
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+    saveAuditLogToCloud(newLog);
   };
 
   return (
@@ -728,6 +977,8 @@ export const DataProvider = ({ children }) => {
       patients,
       appointments,
       specialists,
+      users,
+      auditLogs,
       addAppointment,
       confirmAppointment,
       rescheduleAppointment,
@@ -743,7 +994,11 @@ export const DataProvider = ({ children }) => {
       deleteAppointment,
       addSpecialist,
       updateSpecialist,
-      deleteSpecialist
+      deleteSpecialist,
+      addUser,
+      updateUser,
+      deleteUser,
+      logAction
     }}>
       {children}
     </DataContext.Provider>

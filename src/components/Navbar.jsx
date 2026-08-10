@@ -26,12 +26,6 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <button 
-              onClick={() => onOpenBooking('Vascular Eval')} 
-              className="text-on-surface font-semibold text-sm nav-link hover:text-champagne-gold transition-colors duration-300 cursor-pointer focus:outline-none bg-transparent border-none p-0"
-            >
-              {language === 'es' ? 'Agendar Consulta Gratis' : 'Book Free Consultation'}
-            </button>
             <a href="#services" onClick={() => setView('landing')} className="text-on-surface font-semibold text-sm nav-link hover:text-champagne-gold transition-colors duration-300">
               {t('services')}
             </a>
@@ -105,13 +99,6 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-2">
-          <button 
-            onClick={() => { onOpenBooking('Vascular Eval'); setMobileMenuOpen(false); }}
-            className="text-on-surface-variant hover:bg-champagne-gold/10 rounded-lg mx-2 px-4 py-3 font-semibold text-sm flex items-center gap-3 transition-all text-left w-[calc(100%-16px)] cursor-pointer focus:outline-none bg-transparent border-none"
-          >
-            <span className="material-symbols-outlined text-base">calendar_today</span>
-            {language === 'es' ? 'Agendar Consulta Gratis' : 'Book Free Consultation'}
-          </button>
           <a 
             href="#services" 
             onClick={() => { setView('landing'); setMobileMenuOpen(false); }}

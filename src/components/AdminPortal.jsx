@@ -121,12 +121,14 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
   );
 }
 
-export default function AdminPortal({ adminSubView = 'patients', setAdminSubView, isAuthenticated, setIsAuthenticated }) {
+export default function AdminPortal({ adminSubView = 'patients', setAdminSubView, isAuthenticated, setIsAuthenticated, currentUser, setCurrentUser }) {
   const { t, language } = useLanguage();
   const { 
     patients, 
     appointments, 
     specialists = [],
+    users = [],
+    auditLogs = [],
     saveSoapNote, 
     updateSoapNote,
     saveConsentSignature, 
@@ -141,8 +143,26 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     markAsPresent,
     addSpecialist,
     updateSpecialist,
-    deleteSpecialist
+    deleteSpecialist,
+    addUser,
+    updateUser,
+    deleteUser,
+    logAction
   } = useData();
+
+  // User management state variables
+  const [showNewUserModal, setShowNewUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [searchUserQuery, setSearchUserQuery] = useState('');
+  const [userForm, setUserForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'specialist'
+  });
+
+  // Action log state variables
+  const [searchLogQuery, setSearchLogQuery] = useState('');
 
   // Specialist management state variables
   const [showNewSpecModal, setShowNewSpecModal] = useState(false);
@@ -300,18 +320,28 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   // Auth Handler
   const handleLogin = (e) => {
     e.preventDefault();
-    if (loginForm.username === 'admin@venacomfort.com' && loginForm.password === 'ComfortVeins2026!') {
+    const foundUser = users.find(u => u.email.toLowerCase() === loginForm.username.toLowerCase() && u.password === loginForm.password);
+    if (foundUser) {
       setIsAuthenticated(true);
+      setCurrentUser(foundUser);
       sessionStorage.setItem('venacomfort_auth', 'true');
+      sessionStorage.setItem('venacomfort_user', JSON.stringify(foundUser));
       setLoginError(false);
+      logAction(foundUser.name, 'Sesión Iniciada', `Usuario ingresó al sistema con rol: ${foundUser.role.toUpperCase()}`);
     } else {
       setLoginError(true);
+      logAction('System', 'Intento de Acceso Fallido', `Correo electrónico utilizado: ${loginForm.username}`);
     }
   };
 
   const handleLogout = () => {
+    if (currentUser) {
+      logAction(currentUser.name, 'Sesión Cerrada', 'Usuario cerró sesión de forma segura.');
+    }
     setIsAuthenticated(false);
+    setCurrentUser(null);
     sessionStorage.removeItem('venacomfort_auth');
+    sessionStorage.removeItem('venacomfort_user');
   };
 
   // Filter patients
@@ -349,14 +379,17 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
 
     if (editingSoapNoteId) {
       updateSoapNote(selectedPatientId, editingSoapNoteId, notePayload);
+      logAction(currentUser?.name || 'Admin', 'Nota SOAP Modificada', `Se actualizó la nota SOAP (${selectedProcedureType}) para el paciente ${selectedPatient.firstName} ${selectedPatient.lastName}`);
       setEditingSoapNoteId(null);
     } else {
       saveSoapNote(selectedPatientId, notePayload);
+      logAction(currentUser?.name || 'Admin', 'Nota SOAP Creada', `Nueva nota SOAP registrada (${selectedProcedureType}) para el paciente ${selectedPatient.firstName} ${selectedPatient.lastName}`);
     }
 
     // Save procedure consent signature if signed
     if (sclerotherapySignature && !selectedPatient.consentSigned) {
       saveConsentSignature(selectedPatientId, sclerotherapySignature);
+      logAction(currentUser?.name || 'Admin', 'Consentimiento Firmado', `Consentimiento firmado para escleroterapia por ${selectedPatient.firstName} ${selectedPatient.lastName}`);
     }
 
     alert(language === 'es' ? 'Expediente actualizado correctamente.' : 'Medical record updated successfully.');
@@ -385,6 +418,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   const handleCreatePatient = (e) => {
     e.preventDefault();
     const created = addPatient(newPatientData);
+    logAction(currentUser?.name || 'Admin', 'Paciente Creado', `Se registró al paciente: ${created.firstName} ${created.lastName} (ID: ${created.id})`);
     setSelectedPatientId(created.id);
     setShowNewPatientModal(false);
     setNewPatientData({
@@ -412,6 +446,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   const handleUpdatePatientSubmit = (e) => {
     e.preventDefault();
     updatePatient(selectedPatientId, editPatientData);
+    logAction(currentUser?.name || 'Admin', 'Expediente Modificado', `Se actualizaron los datos demográficos del paciente: ${editPatientData.firstName} ${editPatientData.lastName}`);
     setIsEditingPatient(false);
   };
 
@@ -448,6 +483,8 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       status: 'confirmed',
       price
     });
+
+    logAction(currentUser?.name || 'Admin', 'Seguimiento Agendado', `Nueva cita confirmada para ${selectedPatient.firstName} ${selectedPatient.lastName} el ${newAppointmentData.date} a las ${newAppointmentData.time}`);
 
     alert(language === 'es' ? 'Cita de seguimiento agendada con éxito.' : 'Follow-up appointment successfully scheduled.');
     setNewAppointmentData({
@@ -683,6 +720,207 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   });
 
   const totalNotificationsCount = pendingAppointments.length + unsignedConsentsAlerts.length + suggestionAlerts.length + noShowAlerts.length;
+
+  const renderUsers = () => {
+    const filteredUsersList = users.filter(u => 
+      u.name.toLowerCase().includes(searchUserQuery.toLowerCase()) || 
+      u.email.toLowerCase().includes(searchUserQuery.toLowerCase()) ||
+      u.role.toLowerCase().includes(searchUserQuery.toLowerCase())
+    );
+
+    return (
+      <section className="space-y-6 fade-in-up text-left">
+        {/* Header toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-champagne-gold/10">
+          <div className="relative max-w-md w-full">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg">search</span>
+            <input 
+              type="text"
+              placeholder={language === 'es' ? "Buscar usuarios por nombre, correo..." : "Search users by name, email..."}
+              value={searchUserQuery}
+              onChange={(e) => setSearchUserQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-soft-ivory/20 rounded-lg border border-outline-variant focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold text-sm text-on-surface"
+            />
+          </div>
+          <button 
+            onClick={() => {
+              setUserForm({ name: '', email: '', password: '', role: 'specialist' });
+              setEditingUser(null);
+              setShowNewUserModal(true);
+            }}
+            className="bg-deep-cobalt hover:bg-deep-cobalt/95 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md self-start md:self-auto"
+          >
+            <span className="material-symbols-outlined text-sm">person_add</span>
+            {language === 'es' ? 'Nuevo Usuario' : 'New User'}
+          </button>
+        </div>
+
+        {/* Users list grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredUsersList.map(u => (
+            <div key={u.id} className="bg-white p-6 rounded-2xl border border-outline-variant/60 shadow-sm flex flex-col justify-between gap-4 hover:shadow-md transition-all">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-champagne-gold/10 text-deep-cobalt flex items-center justify-center font-display font-bold text-sm tracking-wide">
+                    {u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <h4 className="font-display font-bold text-sm text-deep-cobalt">{u.name}</h4>
+                    <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider mt-0.5 ${
+                      u.role === 'admin' ? 'bg-deep-cobalt/10 text-deep-cobalt' : 'bg-emerald-500/10 text-emerald-700'
+                    }`}>
+                      {u.role === 'admin' ? (language === 'es' ? 'Administrador' : 'Admin') : (language === 'es' ? 'Especialista' : 'Specialist')}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5 pt-2 text-xs border-t border-ice-blue">
+                  <div className="flex justify-between">
+                    <span className="text-on-surface-variant/80">{language === 'es' ? 'Correo:' : 'Email:'}</span>
+                    <span className="font-semibold text-deep-cobalt">{u.email}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-on-surface-variant/80">{language === 'es' ? 'Contraseña:' : 'Password:'}</span>
+                    <span className="font-mono text-outline font-semibold select-all" title="Click to select">
+                      {u.password}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-ice-blue pt-3 mt-1">
+                <button
+                  onClick={() => {
+                    setUserForm({ name: u.name, email: u.email, password: u.password, role: u.role });
+                    setEditingUser(u);
+                    setShowNewUserModal(true);
+                  }}
+                  className="text-xs font-bold text-deep-cobalt hover:text-champagne-gold transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">edit</span>
+                  {language === 'es' ? 'Editar' : 'Edit'}
+                </button>
+                {u.id !== 'user-admin' && u.email !== currentUser?.email && (
+                  <button
+                    onClick={() => {
+                      const first = window.confirm(language === 'es' ? '¿Eliminar este usuario?' : 'Delete this user?');
+                      if (first) {
+                        const second = window.confirm(
+                          language === 'es'
+                            ? '⚠️ ADVERTENCIA: Esta acción eliminará la cuenta de acceso y su especialista vinculado de forma permanente. ¿Confirmas?'
+                            : '⚠️ WARNING: This will permanently delete the access account and its linked specialist. Confirm?'
+                        );
+                        if (second) {
+                          deleteUser(u.id);
+                          logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta: ${u.email} (${u.name})`);
+                        }
+                      }
+                    }}
+                    className="text-xs font-bold text-error hover:text-error/85 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                    {language === 'es' ? 'Eliminar' : 'Delete'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {filteredUsersList.length === 0 && (
+            <div className="col-span-full bg-white p-12 rounded-2xl text-center border border-champagne-gold/10 text-on-surface-variant/60 text-xs">
+              <span className="material-symbols-outlined text-4xl mb-2 text-on-surface-variant/40 block">manage_accounts</span>
+              {language === 'es' ? 'No se encontraron usuarios' : 'No users found'}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  };
+
+  const renderAuditLogs = () => {
+    const filteredLogs = auditLogs.filter(log => 
+      log.user.toLowerCase().includes(searchLogQuery.toLowerCase()) || 
+      log.action.toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+      log.details.toLowerCase().includes(searchLogQuery.toLowerCase())
+    );
+
+    return (
+      <section className="space-y-6 fade-in-up text-left">
+        {/* Header toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-champagne-gold/10">
+          <div>
+            <h3 className="font-display text-base font-bold text-deep-cobalt uppercase tracking-wider">
+              {language === 'es' ? 'Registro de Acciones del Sistema' : 'System Action Logs'}
+            </h3>
+            <p className="text-[10px] text-on-surface-variant/70 font-semibold tracking-wide mt-1 uppercase">
+              {language === 'es' ? 'Registro de auditoría de seguridad clínica (Cumplimiento HIPAA)' : 'Clinical security audit log (HIPAA Compliance)'}
+            </p>
+          </div>
+          
+          <div className="relative max-w-md w-full">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg">search</span>
+            <input 
+              type="text"
+              placeholder={language === 'es' ? "Buscar registros por acción, usuario o detalles..." : "Search logs by action, user or details..."}
+              value={searchLogQuery}
+              onChange={(e) => setSearchLogQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-soft-ivory/20 rounded-lg border border-outline-variant focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold text-sm text-on-surface"
+            />
+          </div>
+        </div>
+
+        {/* Audit Logs Table */}
+        <div className="bg-white rounded-2xl border border-outline-variant/60 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-xs text-left">
+              <thead>
+                <tr className="bg-soft-ivory/40 text-deep-cobalt border-b border-ice-blue uppercase tracking-wider font-bold text-[10px]">
+                  <th className="p-4 w-1/5">{language === 'es' ? 'Fecha y Hora' : 'Date & Time'}</th>
+                  <th className="p-4 w-1/5">{language === 'es' ? 'Usuario' : 'User'}</th>
+                  <th className="p-4 w-1/4">{language === 'es' ? 'Acción' : 'Action'}</th>
+                  <th className="p-4 w-2/5">{language === 'es' ? 'Detalles' : 'Details'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ice-blue text-on-surface-variant">
+                {filteredLogs.map(log => (
+                  <tr key={log.id} className="hover:bg-soft-ivory/20 transition-colors">
+                    <td className="p-4 font-mono font-medium whitespace-nowrap text-[11px]">
+                      {new Date(log.timestamp).toLocaleString(language === 'es' ? 'es-ES' : 'en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </td>
+                    <td className="p-4 font-bold text-deep-cobalt">{log.user}</td>
+                    <td className="p-4">
+                      <span className="inline-block bg-champagne-gold/10 text-deep-cobalt px-2.5 py-0.5 rounded font-bold uppercase tracking-wider text-[9px] border border-champagne-gold/15">
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="p-4 font-medium max-w-xs truncate" title={log.details}>
+                      {log.details}
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredLogs.length === 0 && (
+                  <tr>
+                    <td colSpan="4" className="p-12 text-center text-on-surface-variant/60">
+                      <span className="material-symbols-outlined text-4xl mb-2 text-on-surface-variant/40 block">history</span>
+                      {language === 'es' ? 'No se encontraron registros de auditoría' : 'No audit logs found'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    );
+  };
 
   const renderSpecialists = () => {
     const filteredSpecs = specialists.filter(s => 
@@ -1154,6 +1392,10 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
         {/* Directory Split Layout */}
         {adminSubView === 'specialists' ? (
           renderSpecialists()
+        ) : adminSubView === 'users' ? (
+          renderUsers()
+        ) : adminSubView === 'audit_logs' ? (
+          renderAuditLogs()
         ) : (
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch min-h-[600px]">
           
@@ -2092,6 +2334,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                                         type="button"
                                         onClick={() => {
                                           markAsNoShow(app.id);
+                                          logAction(currentUser?.name || 'Admin', 'Inasistencia Registrada', `Paciente ${selectedPatient.firstName} ${selectedPatient.lastName} marcado como No Presentó (Cita el ${app.date} @ ${app.time})`);
                                           setToastMessage(language === 'es' ? '¡Marcado como No Presentó!' : 'Marked as No Show!');
                                           setTimeout(() => setToastMessage(null), 3000);
                                         }}
@@ -2107,6 +2350,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                                         type="button"
                                         onClick={() => {
                                           markAsPresent(app.id);
+                                          logAction(currentUser?.name || 'Admin', 'Check-In Realizado', `Paciente ${selectedPatient.firstName} ${selectedPatient.lastName} ingresó a su cita (${app.service} con ${app.doctor})`);
                                           setToastMessage(language === 'es' ? '¡Marcado como Presente!' : 'Marked as Present!');
                                           setTimeout(() => setToastMessage(null), 3000);
                                         }}
@@ -2637,6 +2881,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
               onSubmit={(e) => {
                 e.preventDefault();
                 rescheduleAppointment(reschedulingApp.id, rescheduleForm);
+                logAction(currentUser?.name || 'Admin', 'Cita Reagendada', `Cita del paciente ${reschedulingApp.patientName} reagendada para el ${rescheduleForm.date} a las ${rescheduleForm.time} con ${rescheduleForm.doctor}`);
                 setToastMessage(language === 'es' ? '¡Cita reagendada con éxito!' : 'Appointment rescheduled successfully!');
                 setTimeout(() => setToastMessage(null), 3000);
                 setReschedulingApp(null);
@@ -2714,6 +2959,121 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                   {language === 'es' ? 'Confirmar' : 'Confirm'}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ADD / EDIT USER MODAL */}
+      {showNewUserModal && (
+        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-soft-ivory rounded-3xl overflow-hidden shadow-2xl border border-champagne-gold/20 flex flex-col max-h-[90vh]">
+            <header className="bg-white px-6 py-4 border-b border-champagne-gold/15 flex justify-between items-center shrink-0">
+              <span className="font-display text-lg font-bold text-deep-cobalt">
+                {editingUser 
+                  ? (language === 'es' ? 'Editar Usuario' : 'Edit User') 
+                  : (language === 'es' ? 'Nuevo Usuario' : 'New User')
+                }
+              </span>
+              <button 
+                onClick={() => setShowNewUserModal(false)}
+                className="text-on-surface-variant hover:text-champagne-gold transition-colors flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </header>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!userForm.name || !userForm.email || !userForm.password) {
+                  alert(language === 'es' ? 'Por favor complete todos los campos.' : 'Please complete all fields.');
+                  return;
+                }
+                if (editingUser) {
+                  updateUser(editingUser.id, userForm);
+                  logAction(currentUser?.name || 'Admin', 'Usuario Modificado', `Cuenta: ${userForm.email} (${userForm.name})`);
+                  setToastMessage(language === 'es' ? '¡Usuario actualizado!' : 'User updated successfully!');
+                } else {
+                  addUser(userForm);
+                  logAction(currentUser?.name || 'Admin', 'Usuario Creado', `Cuenta: ${userForm.email} (${userForm.name}) - Rol: ${userForm.role.toUpperCase()}`);
+                  setToastMessage(language === 'es' ? '¡Usuario registrado!' : 'User registered successfully!');
+                }
+                setTimeout(() => setToastMessage(null), 3000);
+                setShowNewUserModal(false);
+              }}
+              className="flex-grow overflow-y-auto p-6 space-y-4 text-left"
+            >
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Nombre Completo' : 'Full Name'} *
+                </label>
+                <input 
+                  type="text"
+                  required
+                  value={userForm.name}
+                  onChange={(e) => setUserForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Correo Electrónico' : 'Email Address'} *
+                </label>
+                <input 
+                  type="email"
+                  required
+                  value={userForm.email}
+                  disabled={!!editingUser}
+                  onChange={(e) => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt disabled:bg-soft-ivory/50 focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Contraseña' : 'Password'} *
+                </label>
+                <input 
+                  type="text"
+                  required
+                  value={userForm.password}
+                  onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder={language === 'es' ? 'Contraseña de acceso' : 'Access password'}
+                  className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt font-mono focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Rol del Sistema' : 'System Role'} *
+                </label>
+                <select
+                  value={userForm.role}
+                  onChange={(e) => setUserForm(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                >
+                  <option value="specialist">{language === 'es' ? 'Especialista Clínico' : 'Clinical Specialist'}</option>
+                  <option value="admin">{language === 'es' ? 'Administrador del Sistema' : 'System Administrator'}</option>
+                </select>
+              </div>
+
+              <footer className="pt-4 border-t border-ice-blue flex justify-end gap-3 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setShowNewUserModal(false)}
+                  className="border border-outline-variant text-on-surface-variant hover:bg-outline-variant/15 px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase cursor-pointer"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-champagne-gold text-white px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase hover:brightness-110 shadow-sm cursor-pointer"
+                >
+                  {editingUser ? (language === 'es' ? 'Guardar' : 'Save') : (language === 'es' ? 'Registrar' : 'Register')}
+                </button>
+              </footer>
             </form>
           </div>
         </div>
