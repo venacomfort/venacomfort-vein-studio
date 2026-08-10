@@ -4,6 +4,33 @@ import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore"
 
 const DataContext = createContext();
 
+const defaultSpecialists = [
+  {
+    id: 'doc-1',
+    name: 'Dr. Elena Rodriguez',
+    title: 'Lead Vascular Specialist',
+    titleEs: 'Especialista Vascular Principal',
+    email: 'elena.rodriguez@venacomfort.com',
+    phone: '786-555-0190',
+    schedule: 'Mon - Fri',
+    scheduleEs: 'Lun - Vie',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmFlvCGywaT-W4-dIbbWMP8IqY3-KNASyMcjp4sn_v17Te9vY81ut7cojgvOOAQtLpF-Gy4REDJOZk1PpiZEnyM-s7JeTIBqUhjnzzy4HaqUUtt_Cla9djQ62nuF3dJQ804xhNJi-dTU_TtcMwfFyo9kqsHe_RdugDAUTG_tVecvEHi25aa4G3cL6v97p3kHjEdBSXXbfu2uSyjn8f0lO5A5CFpFOTGvaqtDsqRG--U9h9Gt8OlN1JRA',
+    status: 'Active'
+  },
+  {
+    id: 'doc-2',
+    name: 'Dr. James Chen',
+    title: 'Phlebologist',
+    titleEs: 'Flebólogo',
+    email: 'james.chen@venacomfort.com',
+    phone: '786-555-0244',
+    schedule: 'Mon - Wed',
+    scheduleEs: 'Lun - Mié',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDuiyzJYn02CAMKE5t7-BD2CZfuqdLQgdyD2dcOyyrWhZGazVivbXNpQ0HMICewLWTHIniLVe9vp5-3yZH8aHhdn3GzTRLSfE5FJmExHm-jdrzUE4VeWkG_JUDRN2Hzvhet8vKbaPKrV5pIapGgIhZMxF93MoOC7pxO5QHGxfUeTCaeOOIKqtgaJw3YONOhAkApVLaBFD_7JFQGXJx2UfRuH5QykR8CbFG_XpwPR53MuhnOJu-UJw5ZMw',
+    status: 'Active'
+  }
+];
+
 const initialPatients = [
   {
     id: 'VC-8924',
@@ -162,12 +189,18 @@ export const DataProvider = ({ children }) => {
     return apps;
   });
 
+  const [specialists, setSpecialists] = useState(() => {
+    const saved = localStorage.getItem('venacomfort_specialists');
+    return saved ? JSON.parse(saved) : defaultSpecialists;
+  });
+
   // Sync cloud database on mount (load and seed if empty)
   useEffect(() => {
     const loadCloudData = async () => {
       try {
         const patientSnap = await getDocs(collection(db, "patients"));
         const appSnap = await getDocs(collection(db, "appointments"));
+        const specSnap = await getDocs(collection(db, "specialists"));
         
         if (patientSnap.empty) {
           // Seed patients
@@ -206,6 +239,22 @@ export const DataProvider = ({ children }) => {
           setAppointments(cloudApps);
           console.log("Cloud Firestore patients and appointments loaded successfully!");
         }
+
+        if (specSnap.empty) {
+          // Seed specialists
+          const specPromises = defaultSpecialists.map(s => {
+            return setDoc(doc(db, "specialists", s.id), s);
+          });
+          await Promise.all(specPromises);
+          console.log("Cloud Firestore specialists seeded successfully!");
+        } else {
+          const cloudSpecs = [];
+          specSnap.forEach(d => {
+            cloudSpecs.push(d.data());
+          });
+          setSpecialists(cloudSpecs);
+          console.log("Cloud Firestore specialists loaded successfully!");
+        }
       } catch (error) {
         console.error("Firestore initialization or load error:", error);
       }
@@ -233,6 +282,14 @@ export const DataProvider = ({ children }) => {
     }
   }, [appointments]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('venacomfort_specialists', JSON.stringify(specialists));
+    } catch (e) {
+      console.error("Local storage specialists sync error:", e);
+    }
+  }, [specialists]);
+
   // Firestore background helper functions
   const savePatientToCloud = async (patient) => {
     try {
@@ -258,9 +315,51 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const saveSpecialistToCloud = async (spec) => {
+    try {
+      await setDoc(doc(db, "specialists", spec.id), spec);
+    } catch (error) {
+      console.error("Firestore saveSpecialistToCloud error:", error);
+    }
+  };
+
+  const deleteSpecialistFromCloud = async (specId) => {
+    try {
+      await deleteDoc(doc(db, "specialists", specId));
+    } catch (error) {
+      console.error("Firestore deleteSpecialistFromCloud error:", error);
+    }
+  };
+
   // Add Appointment (from wizard)
   const addAppointment = (patientData, bookingDetails) => {
-    let patient = patients.find(p => p.email.toLowerCase() === patientData.email.toLowerCase());
+    const normalizePhone = (ph) => {
+      if (!ph) return '';
+      return ph.replace(/\D/g, '');
+    };
+
+    const normalizeName = (nm) => {
+      if (!nm) return '';
+      return nm.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    };
+
+    // Find patient by Email, Phone, or (Name + DOB) to prevent duplication
+    let patient = patients.find(p => {
+      if (p.email && patientData.email && p.email.trim().toLowerCase() === patientData.email.trim().toLowerCase()) {
+        return true;
+      }
+      if (p.phone && patientData.phone && normalizePhone(p.phone) === normalizePhone(patientData.phone)) {
+        return true;
+      }
+      if (p.dob && patientData.dob && p.dob === patientData.dob) {
+        if (normalizeName(p.firstName) === normalizeName(patientData.firstName) && 
+            normalizeName(p.lastName) === normalizeName(patientData.lastName)) {
+          return true;
+        }
+      }
+      return false;
+    });
+
     const patientId = patient ? patient.id : `VC-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newApp = {
@@ -270,12 +369,13 @@ export const DataProvider = ({ children }) => {
       service: bookingDetails.service,
       doctor: bookingDetails.doctor,
       price: bookingDetails.price,
+      status: bookingDetails.status || 'pending_confirmation',
       patientId,
-      patientName: `${patientData.firstName} ${patientData.lastName}`
+      patientName: patient ? `${patient.firstName} ${patient.lastName}` : `${patientData.firstName} ${patientData.lastName}`
     };
 
     if (!patient) {
-      // Create new patient profile with the complete Intake & Social Consent
+      // Create new patient profile
       const newPatient = {
         id: patientId,
         firstName: patientData.firstName,
@@ -289,24 +389,17 @@ export const DataProvider = ({ children }) => {
         emergPhone: patientData.emergPhone || '',
         concerns: patientData.concerns || '',
         allergies: patientData.allergies || '',
-        
-        // Intake Checklist
         pregnancy: patientData.pregnancy || 'No',
         clotsHistory: patientData.clotsHistory || 'No',
         prevVeinTreatments: patientData.prevVeinTreatments || 'No',
         prevVeinTreatmentsDetail: patientData.prevVeinTreatmentsDetail || '',
         allergiesHistory: patientData.allergiesHistory || 'No',
         allergiesHistoryDetail: patientData.allergiesHistoryDetail || '',
-        
-        // Social Media Consent
         socialMediaConsentSigned: !!patientData.socialMediaSignatureUrl,
         socialMediaConsentLevel: patientData.socialMediaConsentLevel || 'level1',
         socialMediaSignatureUrl: patientData.socialMediaSignatureUrl || '',
-        
-        // Procedure Consent
         consentSigned: false,
         consentSignatureUrl: '',
-        
         photos: [],
         soapNotes: [],
         appointments: [newApp]
@@ -314,9 +407,19 @@ export const DataProvider = ({ children }) => {
       setPatients(prev => [...prev, newPatient]);
       savePatientToCloud(newPatient);
     } else {
-      // Append appointment to existing patient
+      // Append appointment to existing patient and merge contact info updates
       const updatedPatient = {
         ...patient,
+        firstName: patientData.firstName || patient.firstName,
+        lastName: patientData.lastName || patient.lastName,
+        dob: patientData.dob || patient.dob,
+        email: patientData.email || patient.email,
+        phone: patientData.phone || patient.phone,
+        address: patientData.address || patient.address,
+        emergName: patientData.emergName || patient.emergName,
+        emergPhone: patientData.emergPhone || patient.emergPhone,
+        concerns: patientData.concerns || patient.concerns,
+        allergies: patientData.allergies || patient.allergies,
         appointments: [...patient.appointments, newApp]
       };
       setPatients(prev => prev.map(p => p.id === patientId ? updatedPatient : p));
@@ -326,6 +429,114 @@ export const DataProvider = ({ children }) => {
     setAppointments(prev => [...prev, newApp]);
     saveAppToCloud(newApp);
     return newApp;
+  };
+
+  const confirmAppointment = (appId) => {
+    setAppointments(prev => prev.map(app => {
+      if (app.id === appId) {
+        const updated = { ...app, status: 'confirmed' };
+        saveAppToCloud(updated);
+        return updated;
+      }
+      return app;
+    }));
+    
+    setPatients(prev => prev.map(p => {
+      const hasApp = p.appointments.some(app => app.id === appId);
+      if (hasApp) {
+        const updatedAppts = p.appointments.map(app => {
+          if (app.id === appId) {
+            return { ...app, status: 'confirmed' };
+          }
+          return app;
+        });
+        const updatedPatient = { ...p, appointments: updatedAppts };
+        savePatientToCloud(updatedPatient);
+        return updatedPatient;
+      }
+      return p;
+    }));
+  };
+
+  const rescheduleAppointment = (appId, newDetails) => {
+    setAppointments(prev => prev.map(app => {
+      if (app.id === appId) {
+        const updated = { ...app, ...newDetails, status: 'confirmed' };
+        saveAppToCloud(updated);
+        return updated;
+      }
+      return app;
+    }));
+    
+    setPatients(prev => prev.map(p => {
+      const hasApp = p.appointments.some(app => app.id === appId);
+      if (hasApp) {
+        const updatedAppts = p.appointments.map(app => {
+          if (app.id === appId) {
+            return { ...app, ...newDetails, status: 'confirmed' };
+          }
+          return app;
+        });
+        const updatedPatient = { ...p, appointments: updatedAppts };
+        savePatientToCloud(updatedPatient);
+        return updatedPatient;
+      }
+      return p;
+    }));
+  };
+
+  const markAsNoShow = (appId) => {
+    setAppointments(prev => prev.map(app => {
+      if (app.id === appId) {
+        const updated = { ...app, status: 'no_show' };
+        saveAppToCloud(updated);
+        return updated;
+      }
+      return app;
+    }));
+    
+    setPatients(prev => prev.map(p => {
+      const hasApp = p.appointments.some(app => app.id === appId);
+      if (hasApp) {
+        const updatedAppts = p.appointments.map(app => {
+          if (app.id === appId) {
+            return { ...app, status: 'no_show' };
+          }
+          return app;
+        });
+        const updatedPatient = { ...p, appointments: updatedAppts };
+        savePatientToCloud(updatedPatient);
+        return updatedPatient;
+      }
+      return p;
+    }));
+  };
+
+  const markAsPresent = (appId) => {
+    setAppointments(prev => prev.map(app => {
+      if (app.id === appId) {
+        const updated = { ...app, status: 'completed' };
+        saveAppToCloud(updated);
+        return updated;
+      }
+      return app;
+    }));
+    
+    setPatients(prev => prev.map(p => {
+      const hasApp = p.appointments.some(app => app.id === appId);
+      if (hasApp) {
+        const updatedAppts = p.appointments.map(app => {
+          if (app.id === appId) {
+            return { ...app, status: 'completed' };
+          }
+          return app;
+        });
+        const updatedPatient = { ...p, appointments: updatedAppts };
+        savePatientToCloud(updatedPatient);
+        return updatedPatient;
+      }
+      return p;
+    }));
   };
 
   // Add Patient directly from Admin Portal
@@ -477,11 +688,47 @@ export const DataProvider = ({ children }) => {
     }));
   };
 
+  // Add Specialist
+  const addSpecialist = (specInfo) => {
+    const newId = `doc-${Date.now()}`;
+    const newSpec = {
+      id: newId,
+      ...specInfo,
+      status: specInfo.status || 'Active'
+    };
+    setSpecialists(prev => [...prev, newSpec]);
+    saveSpecialistToCloud(newSpec);
+    return newSpec;
+  };
+
+  // Update Specialist
+  const updateSpecialist = (specId, updatedInfo) => {
+    setSpecialists(prev => prev.map(s => {
+      if (s.id === specId) {
+        const updated = { ...s, ...updatedInfo };
+        saveSpecialistToCloud(updated);
+        return updated;
+      }
+      return s;
+    }));
+  };
+
+  // Delete Specialist
+  const deleteSpecialist = (specId) => {
+    setSpecialists(prev => prev.filter(s => s.id !== specId));
+    deleteSpecialistFromCloud(specId);
+  };
+
   return (
     <DataContext.Provider value={{
       patients,
       appointments,
+      specialists,
       addAppointment,
+      confirmAppointment,
+      rescheduleAppointment,
+      markAsNoShow,
+      markAsPresent,
       addPatient,
       updatePatient,
       saveSoapNote,
@@ -489,7 +736,10 @@ export const DataProvider = ({ children }) => {
       saveConsentSignature,
       saveSocialMediaConsent,
       uploadPatientPhoto,
-      deleteAppointment
+      deleteAppointment,
+      addSpecialist,
+      updateSpecialist,
+      deleteSpecialist
     }}>
       {children}
     </DataContext.Provider>

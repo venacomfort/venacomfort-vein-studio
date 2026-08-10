@@ -12,7 +12,17 @@ export default function App() {
   const { t, language } = useLanguage();
   const [view, setView] = useState('landing'); // 'landing' or 'admin'
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [adminSubView, setAdminSubView] = useState('patients'); // 'patients' or 'specialists'
+  const [bookingService, setBookingService] = useState('Sclerotherapy');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('venacomfort_auth') === 'true';
+  });
   const [faqOpen, setFaqOpen] = useState(null);
+
+  const handleOpenBooking = (service = 'Sclerotherapy') => {
+    setBookingService(service);
+    setBookingOpen(true);
+  };
 
   const toggleFaq = (index) => {
     setFaqOpen(prev => (prev === index ? null : index));
@@ -65,13 +75,32 @@ export default function App() {
               <span>{t('pricing')}</span>
             </button>
             */}
-            <div className="border-t border-surface-dim my-4 pt-4 px-2">
+            <div className="border-t border-surface-dim my-4 pt-4 px-2 space-y-2">
               <button 
-                className="w-full flex items-center gap-4 bg-champagne-gold/10 text-deep-cobalt rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left border-l-4 border-champagne-gold"
+                onClick={() => setAdminSubView('patients')}
+                className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
+                  adminSubView === 'patients' 
+                    ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
+                    : 'text-on-surface-variant hover:bg-champagne-gold/10'
+                }`}
               >
                 <span className="material-symbols-outlined text-lg">dashboard</span>
-                <span>{t('adminPortal')}</span>
+                <span>{language === 'es' ? 'Portal Clínico' : 'Clinical Portal'}</span>
               </button>
+
+              {isAuthenticated && (
+                <button 
+                  onClick={() => setAdminSubView('specialists')}
+                  className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
+                    adminSubView === 'specialists' 
+                      ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
+                      : 'text-on-surface-variant hover:bg-champagne-gold/10'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-lg">groups</span>
+                  <span>{language === 'es' ? 'Especialistas' : 'Specialists'}</span>
+                </button>
+              )}
             </div>
           </nav>
           <div className="p-4 border-t border-surface-container-high text-center">
@@ -81,7 +110,12 @@ export default function App() {
         </aside>
 
         {/* Main Admin Portal Workspace */}
-        <AdminPortal />
+        <AdminPortal 
+          adminSubView={adminSubView} 
+          setAdminSubView={setAdminSubView} 
+          isAuthenticated={isAuthenticated} 
+          setIsAuthenticated={setIsAuthenticated} 
+        />
       </div>
     );
   }
@@ -92,12 +126,12 @@ export default function App() {
       <Navbar 
         currentView={view} 
         setView={setView} 
-        onOpenBooking={() => setBookingOpen(true)} 
+        onOpenBooking={handleOpenBooking} 
       />
 
       <main className="flex-grow">
         {/* Hero Banner */}
-        <Hero onOpenBooking={() => setBookingOpen(true)} />
+        <Hero onOpenBooking={handleOpenBooking} />
 
         {/* Services / Treatments */}
         <Services />
@@ -224,7 +258,7 @@ export default function App() {
 
       {/* Booking Wizard Modal Overlay */}
       {bookingOpen && (
-        <BookingWizard onClose={() => setBookingOpen(false)} />
+        <BookingWizard onClose={() => setBookingOpen(false)} initialService={bookingService} />
       )}
     </div>
   );

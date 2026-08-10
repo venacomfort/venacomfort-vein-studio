@@ -103,17 +103,27 @@ function BookingSignaturePad({ onSave, onClear }) {
   );
 }
 
-export default function BookingWizard({ onClose }) {
+export default function BookingWizard({ onClose, initialService }) {
   const { t, language } = useLanguage();
-  const { addAppointment } = useData();
+  const { addAppointment, specialists, patients } = useData();
 
   const [step, setStep] = useState(1);
-  const [booking, setBooking] = useState({
-    service: 'Sclerotherapy',
-    doctor: 'Dr. Elena Rodriguez',
-    price: 300,
-    date: '',
-    time: ''
+  const [booking, setBooking] = useState(() => {
+    const servicesList = [
+      { id: 'Sclerotherapy', price: 300 },
+      { id: 'Spider Vein', price: 250 },
+      { id: 'Reticular Veins', price: 500 },
+      { id: 'Vascular Eval', price: 100 }
+    ];
+    const defaultSvcId = initialService || 'Sclerotherapy';
+    const svc = servicesList.find(s => s.id === defaultSvcId) || servicesList[0];
+    return {
+      service: svc.id,
+      doctor: 'Dr. Elena Rodriguez',
+      price: svc.price,
+      date: '',
+      time: ''
+    };
   });
 
   const [patient, setPatient] = useState({
@@ -200,7 +210,45 @@ export default function BookingWizard({ onClose }) {
       alert(language === 'es' ? 'Por favor seleccione fecha y hora.' : 'Please select date and time.');
       return;
     }
-    if (step === 3 && !validateIntake()) {
+    if (step === 3) {
+      if (!validateIntake()) {
+        return;
+      }
+
+      // Check if patient already has an active appointment
+      const normalizePhone = (ph) => ph ? ph.replace(/\D/g, '') : '';
+      const normalizeName = (nm) => nm ? nm.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+      
+      const existingPat = patients.find(p => {
+        if (p.email && patient.email && p.email.trim().toLowerCase() === patient.email.trim().toLowerCase()) return true;
+        if (p.phone && patient.phone && normalizePhone(p.phone) === normalizePhone(patient.phone)) return true;
+        if (p.dob && patient.dob && p.dob === patient.dob) {
+          if (normalizeName(p.firstName) === normalizeName(patient.firstName) && 
+              normalizeName(p.lastName) === normalizeName(patient.lastName)) {
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (existingPat) {
+        const hasActive = existingPat.appointments?.some(app => 
+          app.status === 'confirmed' || 
+          app.status === 'pending_confirmation' || 
+          app.status === 'no_show'
+        );
+        if (hasActive) {
+          alert(language === 'es'
+            ? 'Ya tienes una cita activa o pendiente. Por favor, comunícate con la clínica para reagendarla.'
+            : 'You already have an active or pending appointment. Please contact the clinic to reschedule it.'
+          );
+          return;
+        }
+      }
+
+      const app = addAppointment(patient, booking);
+      setConfirmationCode(app.id);
+      setStep(5);
       return;
     }
     setStep(prev => prev + 1);
@@ -246,26 +294,29 @@ export default function BookingWizard({ onClose }) {
             <div className="absolute left-0 top-4 w-full h-[2px] bg-surface-container-high -z-10"></div>
             <div 
               className="absolute left-0 top-4 h-[2px] bg-champagne-gold -z-10 transition-all duration-300"
-              style={{ width: `${((step - 1) / 4) * 100}%` }}
+              style={{ width: `${((step === 5 ? 3 : step - 1) / 3) * 100}%` }}
             />
-            {[1, 2, 3, 4, 5].map((s) => (
-              <div key={s} className="flex flex-col items-center gap-1">
-                <div 
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow transition-colors ${
-                    step >= s ? 'bg-champagne-gold text-white' : 'bg-surface-container-high text-on-surface-variant'
-                  }`}
-                >
-                  {s}
+            {[1, 2, 3, 5].map((s) => {
+              const displayStep = s === 5 ? 4 : s;
+              const isActive = step === 5 ? s === 5 : step >= s;
+              return (
+                <div key={s} className="flex flex-col items-center gap-1">
+                  <div 
+                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow transition-colors ${
+                      isActive ? 'bg-champagne-gold text-white' : 'bg-surface-container-high text-on-surface-variant'
+                    }`}
+                  >
+                    {displayStep}
+                  </div>
+                  <span className={`text-[10px] font-bold tracking-wider uppercase hidden sm:block ${isActive ? 'text-deep-cobalt' : 'text-on-surface-variant/60'}`}>
+                    {s === 1 && t('stepService')}
+                    {s === 2 && t('stepDateTime')}
+                    {s === 3 && t('stepDetails')}
+                    {s === 5 && t('stepDone')}
+                  </span>
                 </div>
-                <span className={`text-[10px] font-bold tracking-wider uppercase hidden sm:block ${step >= s ? 'text-deep-cobalt' : 'text-on-surface-variant/60'}`}>
-                  {s === 1 && t('stepService')}
-                  {s === 2 && t('stepDateTime')}
-                  {s === 3 && t('stepDetails')}
-                  {s === 4 && t('stepPayment')}
-                  {s === 5 && t('stepDone')}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -310,7 +361,6 @@ export default function BookingWizard({ onClose }) {
                             <span className="text-xs text-on-surface-variant">{s.desc}</span>
                           </div>
                         </div>
-                        <span className="font-display font-bold text-sm text-deep-cobalt">${s.price}</span>
                       </div>
                     </label>
                   ))}
@@ -320,25 +370,24 @@ export default function BookingWizard({ onClose }) {
                   <h3 className="font-semibold text-xs tracking-wider text-on-surface-variant uppercase mb-2">
                     {t('selectSpecialist')}
                   </h3>
-                  {[
-                    { id: 'Dr. Elena Rodriguez', name: 'Dr. Elena Rodriguez', title: 'Lead Vascular Specialist', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmFlvCGywaT-W4-dIbbWMP8IqY3-KNASyMcjp4sn_v17Te9vY81ut7cojgvOOAQtLpF-Gy4REDJOZk1PpiZEnyM-s7JeTIBqUhjnzzy4HaqUUtt_Cla9djQ62nuF3dJQ804xhNJi-dTU_TtcMwfFyo9kqsHe_RdugDAUTG_tVecvEHi25aa4G3cL6v97p3kHjEdBSXXbfu2uSyjn8f0lO5A5CFpFOTGvaqtDsqRG--U9h9Gt8OlN1JRA' },
-                    { id: 'Dr. James Chen', name: 'Dr. James Chen', title: 'Phlebologist', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDuiyzJYn02CAMKE5t7-BD2CZfuqdLQgdyD2dcOyyrWhZGazVivbXNpQ0HMICewLWTHIniLVe9vp5-3yZH8aHhdn3GzTRLSfE5FJmExHm-jdrzUE4VeWkG_JUDRN2Hzvhet8vKbaPKrV5pIapGgIhZMxF93MoOC7pxO5QHGxfUeTCaeOOIKqtgaJw3YONOhAkApVLaBFD_7JFQGXJx2UfRuH5QykR8CbFG_XpwPR53MuhnOJu-UJw5ZMw' }
-                  ].map((doc) => (
+                  {specialists.filter(s => s.status === 'Active').map((doc) => (
                     <label key={doc.id} className="block cursor-pointer">
                       <input 
                         type="radio" 
                         name="doctor"
-                        checked={booking.doctor === doc.id}
-                        onChange={() => handleBookingChange('doctor', doc.id)}
+                        checked={booking.doctor === doc.name}
+                        onChange={() => handleBookingChange('doctor', doc.name)}
                         className="sr-only"
                       />
                       <div className={`p-4 border rounded-xl hover:border-champagne-gold transition-all flex items-center gap-4 ${
-                        booking.doctor === doc.id ? 'border-champagne-gold bg-champagne-gold/5 shadow-sm' : 'border-outline-variant bg-white/70'
+                        booking.doctor === doc.name ? 'border-champagne-gold bg-champagne-gold/5 shadow-sm' : 'border-outline-variant bg-white/70'
                       }`}>
                         <img src={doc.image} alt={doc.name} className="w-12 h-12 rounded-full object-cover border border-champagne-gold/30" />
                         <div>
                           <span className="font-semibold text-sm text-deep-cobalt block">{doc.name}</span>
-                          <span className="text-xs text-on-surface-variant">{doc.title}</span>
+                          <span className="text-xs text-on-surface-variant">
+                            {language === 'es' ? doc.titleEs || doc.title : doc.title}
+                          </span>
                         </div>
                       </div>
                     </label>

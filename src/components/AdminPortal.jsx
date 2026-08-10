@@ -121,11 +121,12 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
   );
 }
 
-export default function AdminPortal() {
+export default function AdminPortal({ adminSubView = 'patients', setAdminSubView, isAuthenticated, setIsAuthenticated }) {
   const { t, language } = useLanguage();
   const { 
     patients, 
     appointments, 
+    specialists = [],
     saveSoapNote, 
     updateSoapNote,
     saveConsentSignature, 
@@ -133,13 +134,44 @@ export default function AdminPortal() {
     uploadPatientPhoto, 
     addPatient,
     updatePatient,
-    addAppointment
+    addAppointment,
+    confirmAppointment,
+    rescheduleAppointment,
+    markAsNoShow,
+    markAsPresent,
+    addSpecialist,
+    updateSpecialist,
+    deleteSpecialist
   } = useData();
 
-  // Authentication states
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('venacomfort_auth') === 'true';
+  // Specialist management state variables
+  const [showNewSpecModal, setShowNewSpecModal] = useState(false);
+  const [editingSpec, setEditingSpec] = useState(null);
+  const [searchSpecQuery, setSearchSpecQuery] = useState('');
+  const [specForm, setSpecForm] = useState({
+    name: '',
+    title: '',
+    titleEs: '',
+    email: '',
+    phone: '',
+    schedule: 'Mon - Fri',
+    scheduleEs: 'Lun - Vie',
+    image: '',
+    status: 'Active'
   });
+
+  // Rescheduling states
+  const [reschedulingApp, setReschedulingApp] = useState(null);
+  const [rescheduleForm, setRescheduleForm] = useState({
+    date: '',
+    time: '',
+    doctor: 'Dr. Elena Rodriguez'
+  });
+
+  // Notification center state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState(false);
 
@@ -251,6 +283,13 @@ export default function AdminPortal() {
       setAdminSocialConsentLevel(selectedPatient.socialMediaConsentLevel || 'level1');
     }
   }, [selectedPatientId]);
+
+  useEffect(() => {
+    const activeDoc = specialists.find(s => s.status === 'Active');
+    if (activeDoc) {
+      setNewAppointmentData(prev => ({ ...prev, doctor: activeDoc.name }));
+    }
+  }, [specialists]);
 
   // Auth Handler
   const handleLogin = (e) => {
@@ -377,6 +416,20 @@ export default function AdminPortal() {
       alert(language === 'es' ? 'Por favor seleccione fecha y hora.' : 'Please select date and time.');
       return;
     }
+
+    // Block booking if there is any active, pending, or no-show appointment
+    const hasActiveApp = selectedPatient.appointments?.some(app => 
+      app.status === 'confirmed' || 
+      app.status === 'pending_confirmation' || 
+      app.status === 'no_show'
+    );
+    if (hasActiveApp) {
+      alert(language === 'es' 
+        ? 'No se puede agendar una cita nueva manual porque el paciente ya tiene una cita activa, pendiente o sin asistir. Por favor reagende la cita existente.' 
+        : 'Cannot schedule a new follow-up appointment because this patient already has an active, pending, or no-show appointment. Please reschedule the existing one.'
+      );
+      return;
+    }
     
     // Set pricing based on service type
     let price = 300;
@@ -386,6 +439,7 @@ export default function AdminPortal() {
 
     addAppointment(selectedPatient, {
       ...newAppointmentData,
+      status: 'confirmed',
       price
     });
 
@@ -436,6 +490,45 @@ export default function AdminPortal() {
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
         uploadPatientPhoto(selectedPatientId, compressedBase64, newPhotoLabel);
         alert(language === 'es' ? 'Fotografía comprimida e incorporada con éxito.' : 'Photo compressed and successfully added.');
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSpecPhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        setSpecForm(prev => ({ ...prev, image: compressedBase64 }));
       };
     };
     reader.readAsDataURL(file);
@@ -536,18 +629,466 @@ export default function AdminPortal() {
     );
   }
 
+  // Notification calculations
+  const pendingAppointments = appointments.filter(app => app.status === 'pending_confirmation');
+  const noShowAlerts = appointments.filter(app => app.status === 'no_show');
+
+  const unsignedConsentsAlerts = [];
+  const suggestionAlerts = [];
+
+  const today = new Date();
+  const seventyTwoHoursLater = new Date(today.getTime() + 72 * 60 * 60 * 1000);
+  const twentyFourHoursLater = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+  appointments.forEach(app => {
+    const appDate = new Date(app.date);
+    const pat = patients.find(p => p.id === app.patientId);
+    
+    if (pat) {
+      // Unsigned consents before 72 hours
+      if (appDate >= today && appDate <= seventyTwoHoursLater) {
+        if (!pat.consentSigned || !pat.socialMediaConsentSigned) {
+          unsignedConsentsAlerts.push({
+            id: `alert-consent-${app.id}`,
+            patientName: app.patientName,
+            patientId: app.patientId,
+            appointmentId: app.id,
+            date: app.date,
+            time: app.time,
+            unsignedSclero: !pat.consentSigned,
+            unsignedSocial: !pat.socialMediaConsentSigned
+          });
+        }
+      }
+      
+      // Suggestions: appointment in next 24 hours but last appointment has no SOAP note
+      if (appDate >= today && appDate <= twentyFourHoursLater) {
+        if (pat.soapNotes.length === 0) {
+          suggestionAlerts.push({
+            id: `alert-sug-${app.id}`,
+            patientName: app.patientName,
+            patientId: app.patientId,
+            appointmentId: app.id,
+            type: 'no_soap'
+          });
+        }
+      }
+    }
+  });
+
+  const totalNotificationsCount = pendingAppointments.length + unsignedConsentsAlerts.length + suggestionAlerts.length + noShowAlerts.length;
+
+  const renderSpecialists = () => {
+    const filteredSpecs = specialists.filter(s => 
+      s.name.toLowerCase().includes(searchSpecQuery.toLowerCase()) || 
+      (s.title && s.title.toLowerCase().includes(searchSpecQuery.toLowerCase())) ||
+      (s.titleEs && s.titleEs.toLowerCase().includes(searchSpecQuery.toLowerCase()))
+    );
+
+    return (
+      <section className="space-y-6 fade-in-up">
+        {/* Header toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-champagne-gold/10">
+          <div className="relative max-w-md w-full">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg">search</span>
+            <input 
+              type="text"
+              placeholder={language === 'es' ? 'Buscar especialista por nombre o título...' : 'Search specialist by name or title...'}
+              value={searchSpecQuery}
+              onChange={(e) => setSearchSpecQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-soft-ivory/20 rounded-lg border border-outline-variant focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold text-sm text-on-surface"
+            />
+          </div>
+          <button
+            onClick={() => {
+              setEditingSpec(null);
+              setSpecForm({
+                name: '',
+                title: '',
+                titleEs: '',
+                email: '',
+                phone: '',
+                schedule: 'Mon - Fri',
+                scheduleEs: 'Lun - Vie',
+                image: '',
+                status: 'Active'
+              });
+              setShowNewSpecModal(true);
+            }}
+            className="bg-champagne-gold text-white font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-lg hover:brightness-110 transition-all shadow-sm cursor-pointer flex items-center gap-1 self-start md:self-auto"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            {language === 'es' ? 'Agregar Especialista' : 'Add Specialist'}
+          </button>
+        </div>
+
+        {/* Specialists Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredSpecs.map(spec => (
+            <div key={spec.id} className="glass-panel p-6 rounded-2xl bg-white shadow-sm flex flex-col justify-between border border-champagne-gold/10 relative overflow-hidden group hover:scale-[1.01] transition-all duration-300">
+              <div className="flex gap-4">
+                <img 
+                  src={spec.image || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=200'} 
+                  alt={spec.name} 
+                  className="w-16 h-16 rounded-full object-cover border border-champagne-gold/30 shrink-0" 
+                />
+                <div className="space-y-1">
+                  <span className="font-display font-bold text-deep-cobalt block text-base">{spec.name}</span>
+                  <span className="text-xs text-secondary font-semibold block">
+                    {language === 'es' ? spec.titleEs || spec.title : spec.title}
+                  </span>
+                  <span className={`inline-block text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                    spec.status === 'Active' ? 'bg-success-container/30 text-success' : 'bg-surface-dim text-on-surface-variant'
+                  }`}>
+                    {spec.status === 'Active' ? (language === 'es' ? 'Activo' : 'Active') : (language === 'es' ? 'Inactivo' : 'Inactive')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-surface-container-high/60 my-4 pt-4 space-y-2 text-xs text-on-surface-variant">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-champagne-gold">mail</span>
+                  <span>{spec.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-champagne-gold">phone</span>
+                  <span>{spec.phone}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-champagne-gold">calendar_month</span>
+                  <span>{language === 'es' ? spec.scheduleEs || spec.schedule : spec.schedule}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end border-t border-surface-container-high/60 pt-4">
+                <button
+                  onClick={() => {
+                    setEditingSpec(spec);
+                    setSpecForm({
+                      name: spec.name,
+                      title: spec.title || '',
+                      titleEs: spec.titleEs || '',
+                      email: spec.email || '',
+                      phone: spec.phone || '',
+                      schedule: spec.schedule || 'Mon - Fri',
+                      scheduleEs: spec.scheduleEs || 'Lun - Vie',
+                      image: spec.image || '',
+                      status: spec.status || 'Active'
+                    });
+                    setShowNewSpecModal(true);
+                  }}
+                  className="border border-outline-variant text-on-surface-variant hover:text-champagne-gold hover:border-champagne-gold px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  {language === 'es' ? 'Editar' : 'Edit'}
+                </button>
+                <button
+                  onClick={() => {
+                    const nextStatus = spec.status === 'Active' ? 'Inactive' : 'Active';
+                    updateSpecialist(spec.id, { status: nextStatus });
+                  }}
+                  className={`px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer ${
+                    spec.status === 'Active' 
+                      ? 'border border-error/25 text-error hover:bg-error-container/20' 
+                      : 'border border-success/25 text-success hover:bg-success-container/20'
+                  }`}
+                >
+                  {spec.status === 'Active' ? (language === 'es' ? 'Desactivar' : 'Deactivate') : (language === 'es' ? 'Activar' : 'Activate')}
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(language === 'es' ? '¿Estás seguro de eliminar este especialista?' : 'Are you sure you want to delete this specialist?')) {
+                      deleteSpecialist(spec.id);
+                    }
+                  }}
+                  className="text-on-surface-variant/40 hover:text-error px-1.5 py-1.5 rounded cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-base">delete</span>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {filteredSpecs.length === 0 && (
+            <div className="col-span-full bg-white p-12 rounded-2xl text-center border border-champagne-gold/10 text-on-surface-variant/60 text-xs">
+              <span className="material-symbols-outlined text-4xl mb-2 text-on-surface-variant/40 block">groups</span>
+              {language === 'es' ? 'No se encontraron especialistas' : 'No specialists found'}
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex-grow flex flex-col h-full overflow-hidden bg-background relative">
+      {/* Toast popup */}
+      {toastMessage && (
+        <div className="absolute top-4 right-4 bg-deep-cobalt text-white border border-champagne-gold/25 px-4 py-3 rounded-xl shadow-2xl z-[200] flex items-center gap-2 text-xs font-semibold animate-fade-in">
+          <span className="material-symbols-outlined text-champagne-gold text-lg">check_circle</span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Admin Top Header */}
       <header className="bg-white/80 backdrop-blur-xl h-20 flex items-center justify-between px-margin-mobile md:px-margin-desktop bg-white border-b border-champagne-gold/10 shrink-0 z-30">
         <div className="flex items-center gap-4 text-primary">
           <span className="material-symbols-outlined text-3xl font-light">local_hospital</span>
           <h2 className="font-display text-xl font-bold">{t('clinicalPortal')}</h2>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
+          
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 rounded-lg hover:bg-champagne-gold/10 text-on-surface-variant transition-all cursor-pointer flex items-center justify-center focus:outline-none"
+            >
+              <span className="material-symbols-outlined text-2xl font-light">notifications</span>
+              {totalNotificationsCount > 0 && (
+                <span className="absolute top-1 right-1 w-5 h-5 bg-error text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                  {totalNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications Popover Dropdown */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 md:w-96 bg-white border border-champagne-gold/15 rounded-2xl shadow-xl z-50 overflow-hidden text-left animate-fade-in max-h-[500px] flex flex-col">
+                <header className="px-4 py-3 bg-soft-ivory border-b border-champagne-gold/10 flex justify-between items-center">
+                  <span className="font-display font-semibold text-xs text-deep-cobalt uppercase tracking-wider">
+                    {language === 'es' ? 'Notificaciones' : 'System Notifications'}
+                  </span>
+                  <span className="text-[10px] bg-champagne-gold/15 text-secondary px-2.5 py-0.5 rounded-full font-bold">
+                    {totalNotificationsCount} {language === 'es' ? 'activas' : 'active'}
+                  </span>
+                </header>
+
+                <div className="flex-1 overflow-y-auto divide-y divide-surface-container-high/60 max-h-[400px]">
+                  {/* Category 1: Pending Appointments */}
+                  {pendingAppointments.length > 0 && (
+                    <div className="p-3 bg-champagne-gold/5">
+                      <span className="text-[9px] font-bold text-secondary uppercase tracking-widest block mb-2">
+                        {language === 'es' ? '⚠️ Confirmar Citas' : '⚠️ Confirm Appointments'}
+                      </span>
+                      <div className="space-y-2">
+                        {pendingAppointments.map(app => (
+                          <div key={app.id} className="text-xs bg-white p-2.5 rounded-lg border border-champagne-gold/10 flex flex-col gap-2">
+                            <div 
+                              onClick={() => {
+                                setSelectedPatientId(app.patientId);
+                                setActiveTab('appointments');
+                                setAdminSubView('patients');
+                                setShowNotifications(false);
+                              }}
+                              className="cursor-pointer hover:opacity-80 transition-opacity text-left"
+                            >
+                              <span className="font-semibold text-deep-cobalt block">{app.patientName}</span>
+                              <span className="text-on-surface-variant block text-[10px] mt-0.5">{app.service} • {app.date} a las {app.time}</span>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <button 
+                                onClick={() => {
+                                  confirmAppointment(app.id);
+                                  setToastMessage(language === 'es' ? '¡Cita confirmada con éxito!' : 'Appointment confirmed successfully!');
+                                  setTimeout(() => setToastMessage(null), 3000);
+                                }}
+                                className="bg-champagne-gold text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer font-semibold"
+                              >
+                                {language === 'es' ? 'Confirmar' : 'Confirm'}
+                              </button>
+                              
+                              <button 
+                                onClick={() => {
+                                  setReschedulingApp(app);
+                                  setRescheduleForm({
+                                    date: app.date || '',
+                                    time: app.time || '',
+                                    doctor: app.doctor || 'Dr. Elena Rodriguez'
+                                  });
+                                  setShowNotifications(false);
+                                }}
+                                className="border border-deep-cobalt text-deep-cobalt hover:bg-deep-cobalt hover:text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold"
+                              >
+                                {language === 'es' ? 'Reagendar' : 'Reagendar'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 2: Unsigned Consents <72 hours */}
+                  {unsignedConsentsAlerts.length > 0 && (
+                    <div className="p-3">
+                      <span className="text-[9px] font-bold text-error uppercase tracking-widest block mb-2">
+                        {language === 'es' ? '✍️ Firmas Pendientes (<72h)' : '✍️ Unsigned Consents (<72h)'}
+                      </span>
+                      <div className="space-y-2">
+                        {unsignedConsentsAlerts.map(alert => (
+                          <div key={alert.id} className="text-xs bg-error-container/20 p-2.5 rounded-lg border border-error/10 flex flex-col gap-2">
+                            <div 
+                              onClick={() => {
+                                setSelectedPatientId(alert.patientId);
+                                setActiveTab('appointments');
+                                setAdminSubView('patients');
+                                setShowNotifications(false);
+                              }}
+                              className="cursor-pointer hover:opacity-80 transition-opacity text-left"
+                            >
+                              <span className="font-semibold text-deep-cobalt block">{alert.patientName}</span>
+                              <span className="text-on-surface-variant block text-[10px] mt-0.5 leading-normal">
+                                {language === 'es' 
+                                  ? `Cita el ${alert.date} a las ${alert.time}. Falta: ` 
+                                  : `Appt on ${alert.date} @ ${alert.time}. Missing: `
+                                }
+                                <strong className="text-error font-semibold">
+                                  {[alert.unsignedSclero && 'Consentimiento', alert.unsignedSocial && 'Redes'].filter(Boolean).join(', ')}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex justify-end">
+                              <button 
+                                onClick={() => {
+                                  setToastMessage(language === 'es' ? `¡Recordatorio enviado a ${alert.patientName}!` : `Reminder sent to ${alert.patientName}!`);
+                                  setTimeout(() => setToastMessage(null), 3000);
+                                }}
+                                className="border border-error/30 text-error px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider hover:bg-error-container/40 cursor-pointer"
+                              >
+                                {language === 'es' ? 'Recordar' : 'Remind'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 3: Clinical Suggestions */}
+                  {suggestionAlerts.length > 0 && (
+                    <div className="p-3">
+                      <span className="text-[9px] font-bold text-deep-cobalt uppercase tracking-widest block mb-2">
+                        {language === 'es' ? '💡 Sugerencias Clínicas' : '💡 Clinical Suggestions'}
+                      </span>
+                      <div className="space-y-2">
+                        {suggestionAlerts.map(sug => (
+                          <div key={sug.id} className="text-xs bg-soft-ivory p-2.5 rounded-lg border border-surface-dim flex flex-col gap-2">
+                            <div 
+                              onClick={() => {
+                                setSelectedPatientId(sug.patientId);
+                                setActiveTab('appointments');
+                                setAdminSubView('patients');
+                                setShowNotifications(false);
+                              }}
+                              className="cursor-pointer hover:opacity-80 transition-opacity text-left"
+                            >
+                              <span className="font-semibold text-deep-cobalt block">{sug.patientName}</span>
+                              <span className="text-on-surface-variant block text-[10px] mt-0.5 leading-normal">
+                                {language === 'es' 
+                                  ? 'Tiene cita próxima pero no se ha registrado Nota SOAP para la sesión.' 
+                                  : 'Has upcoming appointment but no SOAP note is registered for the treatment.'
+                                }
+                              </span>
+                            </div>
+                            <div className="flex justify-end">
+                              <button 
+                                onClick={() => {
+                                  setSelectedPatientId(sug.patientId);
+                                  setActiveTab('soap');
+                                  setAdminSubView('patients');
+                                  setShowNotifications(false);
+                                }}
+                                className="bg-deep-cobalt text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                              >
+                                {language === 'es' ? 'Crear Nota' : 'Create SOAP'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 4: No Shows */}
+                  {noShowAlerts.length > 0 && (
+                    <div className="p-3 bg-red-50/70 border-t border-red-100">
+                      <span className="text-[9px] font-bold text-red-600 uppercase tracking-widest block mb-2">
+                        {language === 'es' ? '❌ No Show (Llamar y Reagendar)' : '❌ No Show (Call & Reschedule)'}
+                      </span>
+                      <div className="space-y-2">
+                        {noShowAlerts.map(app => {
+                          const pat = patients.find(p => p.id === app.patientId);
+                          const phone = pat ? pat.phone : '';
+                          return (
+                            <div key={app.id} className="text-xs bg-white p-2.5 rounded-lg border border-red-200 flex flex-col gap-2 shadow-sm">
+                              <div 
+                                onClick={() => {
+                                  setSelectedPatientId(app.patientId);
+                                  setActiveTab('appointments');
+                                  setAdminSubView('patients');
+                                  setShowNotifications(false);
+                                }}
+                                className="cursor-pointer hover:opacity-80 transition-opacity text-left"
+                              >
+                                <span className="font-semibold text-deep-cobalt block">{app.patientName}</span>
+                                <span className="text-on-surface-variant block text-[10px] mt-0.5 leading-normal">
+                                  {language === 'es' 
+                                    ? `No se presentó a la cita del ${app.date}.` 
+                                    : `Did not show up for appointment on ${app.date}.`
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex gap-2 justify-end">
+                                <a 
+                                  href={`tel:${phone}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setToastMessage(language === 'es' ? `Llamando a ${app.patientName} (${phone})...` : `Calling ${app.patientName} (${phone})...`);
+                                    setTimeout(() => setToastMessage(null), 4000);
+                                  }}
+                                  className="border border-red-500 text-red-500 hover:bg-red-50 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold flex items-center gap-1 bg-transparent"
+                                >
+                                  <span className="material-symbols-outlined text-xs">phone</span>
+                                  {language === 'es' ? 'Llamar' : 'Call'}
+                                </a>
+                                
+                                <button 
+                                  onClick={() => {
+                                    setReschedulingApp(app);
+                                    setRescheduleForm({
+                                      date: app.date || '',
+                                      time: app.time || '',
+                                      doctor: app.doctor || 'Dr. Elena Rodriguez'
+                                    });
+                                    setShowNotifications(false);
+                                  }}
+                                  className="bg-deep-cobalt text-white hover:brightness-110 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold flex items-center gap-1"
+                                >
+                                  <span className="material-symbols-outlined text-xs">calendar_today</span>
+                                  {language === 'es' ? 'Reagendar' : 'Reschedule'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {totalNotificationsCount === 0 && (
+                    <div className="p-8 text-center text-on-surface-variant/60 text-xs">
+                      <span className="material-symbols-outlined text-3xl mb-1 text-on-surface-variant/40 block">check_circle</span>
+                      {language === 'es' ? 'No tienes alertas pendientes' : 'No pending notifications'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button 
             onClick={() => setShowNewPatientModal(true)}
-            className="bg-champagne-gold text-white font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-lg hover:brightness-110 transition-all shadow-sm cursor-pointer"
+            className="bg-champagne-gold text-white font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-lg hover:brightness-110 transition-all shadow-sm cursor-pointer animate-fade-in"
           >
             {t('newPatient')}
           </button>
@@ -593,7 +1134,10 @@ export default function AdminPortal() {
         </section>
 
         {/* Directory Split Layout */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch min-h-[600px]">
+        {adminSubView === 'specialists' ? (
+          renderSpecialists()
+        ) : (
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch min-h-[600px]">
           
           {/* Patient sidebar list */}
           <div className="lg:col-span-4 glass-panel rounded-2xl shadow-sm flex flex-col overflow-hidden bg-white">
@@ -1473,14 +2017,86 @@ export default function AdminPortal() {
                           {selectedPatient.appointments && selectedPatient.appointments.length > 0 ? (
                             <div className="space-y-3">
                               {selectedPatient.appointments.map((app) => (
-                                <div key={app.id} className="p-4 rounded-xl border border-outline-variant bg-soft-ivory/20 flex justify-between items-center text-xs">
-                                  <div>
-                                    <span className="font-bold text-deep-cobalt block">{app.service}</span>
-                                    <span className="text-on-surface-variant">{app.doctor}</span>
+                                <div key={app.id} className="p-4 rounded-xl border border-outline-variant bg-soft-ivory/20 flex flex-col gap-3 text-xs">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                        <span className="font-bold text-deep-cobalt">{app.service}</span>
+                                        {/* Status Badges */}
+                                        {app.status === 'confirmed' && (
+                                          <span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                            {language === 'es' ? 'Confirmada' : 'Confirmed'}
+                                          </span>
+                                        )}
+                                        {(app.status === 'pending_confirmation' || !app.status) && (
+                                          <span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                            {language === 'es' ? 'Pendiente' : 'Pending'}
+                                          </span>
+                                        )}
+                                        {app.status === 'no_show' && (
+                                          <span className="bg-rose-100 text-rose-800 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                            {language === 'es' ? 'No Presentó' : 'No Show'}
+                                          </span>
+                                        )}
+                                        {app.status === 'completed' && (
+                                          <span className="bg-deep-cobalt/10 text-deep-cobalt text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                            {language === 'es' ? 'Presente' : 'Arrived'}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-on-surface-variant block">{app.doctor}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="font-bold text-deep-cobalt block">{app.date} @ {app.time}</span>
+                                    </div>
                                   </div>
-                                  <div className="text-right">
-                                    <span className="font-bold text-deep-cobalt block">{app.date} @ {app.time}</span>
-                                    <span className="text-[10px] bg-champagne-gold/10 text-champagne-gold px-2.5 py-0.5 rounded-full font-bold">${app.price}</span>
+
+                                  <div className="flex gap-2 justify-end border-t border-champagne-gold/10 pt-2.5">
+                                    {/* Reschedule Button */}
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        setReschedulingApp(app);
+                                        setRescheduleForm({
+                                          date: app.date || '',
+                                          time: app.time || '',
+                                          doctor: app.doctor || 'Dr. Elena Rodriguez'
+                                        });
+                                      }}
+                                      className="border border-deep-cobalt hover:bg-deep-cobalt hover:text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold"
+                                    >
+                                      {language === 'es' ? 'Reagendar' : 'Reschedule'}
+                                    </button>
+
+                                    {/* Mark as No Show */}
+                                    {app.status !== 'no_show' && app.status !== 'completed' && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => {
+                                          markAsNoShow(app.id);
+                                          setToastMessage(language === 'es' ? '¡Marcado como No Presentó!' : 'Marked as No Show!');
+                                          setTimeout(() => setToastMessage(null), 3000);
+                                        }}
+                                        className="border border-rose-500 text-rose-500 hover:bg-rose-50 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold"
+                                      >
+                                        {language === 'es' ? 'No se presentó' : 'No Show'}
+                                      </button>
+                                    )}
+
+                                    {/* Mark as Present (Suggestion for check-in) */}
+                                    {app.status !== 'no_show' && app.status !== 'completed' && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => {
+                                          markAsPresent(app.id);
+                                          setToastMessage(language === 'es' ? '¡Marcado como Presente!' : 'Marked as Present!');
+                                          setTimeout(() => setToastMessage(null), 3000);
+                                        }}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer transition-colors font-semibold"
+                                      >
+                                        {language === 'es' ? 'Presente' : 'Check-In'}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -1496,6 +2112,22 @@ export default function AdminPortal() {
                             {language === 'es' ? 'Agendar Seguimiento' : 'Schedule Follow-up'}
                           </h4>
                           
+                          {selectedPatient.appointments?.some(app => 
+                            app.status === 'confirmed' || 
+                            app.status === 'pending_confirmation' || 
+                            app.status === 'no_show'
+                          ) && (
+                            <div className="bg-rose-50 border border-rose-200 text-rose-800 text-[11px] p-3 rounded-lg leading-relaxed flex items-start gap-2 animate-pulse">
+                              <span className="material-symbols-outlined text-sm shrink-0 mt-0.5 text-rose-500 font-bold">warning</span>
+                              <span>
+                                {language === 'es'
+                                  ? 'El paciente ya tiene una cita activa, pendiente o sin asistir. Favor reagendar la cita correspondiente en el historial de la izquierda en vez de crear una nueva.'
+                                  : 'The patient already has an active, pending, or no-show appointment. Please reschedule that existing appointment in the list to the left instead of scheduling a new one.'
+                                }
+                              </span>
+                            </div>
+                          )}
+
                           <form onSubmit={handleBookFollowUp} className="space-y-4">
                             <div>
                               <label className="block text-xs font-bold text-on-surface-variant mb-1">Service</label>
@@ -1504,10 +2136,10 @@ export default function AdminPortal() {
                                 onChange={(e) => setNewAppointmentData(prev => ({ ...prev, service: e.target.value }))}
                                 className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt"
                               >
-                                <option value="Sclerotherapy">Sclerotherapy ($300)</option>
-                                <option value="Spider Vein">Spider Vein Laser ($250)</option>
-                                <option value="Reticular Veins">Reticular Veins Treatment ($500)</option>
-                                <option value="Vascular Eval">Vascular Evaluation ($100)</option>
+                                <option value="Sclerotherapy">Sclerotherapy</option>
+                                <option value="Spider Vein">Spider Vein Laser</option>
+                                <option value="Reticular Veins">Reticular Veins Treatment</option>
+                                <option value="Vascular Eval">Vascular Evaluation</option>
                               </select>
                             </div>
 
@@ -1516,10 +2148,11 @@ export default function AdminPortal() {
                               <select 
                                 value={newAppointmentData.doctor}
                                 onChange={(e) => setNewAppointmentData(prev => ({ ...prev, doctor: e.target.value }))}
-                                className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt"
+                                className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt bg-white"
                               >
-                                <option value="Dr. Elena Rodriguez">Dr. Elena Rodriguez</option>
-                                <option value="Dr. James Chen">Dr. James Chen</option>
+                                {specialists.filter(s => s.status === 'Active').map(s => (
+                                  <option key={s.id} value={s.name}>{s.name}</option>
+                                ))}
                               </select>
                             </div>
 
@@ -1578,6 +2211,7 @@ export default function AdminPortal() {
           </div>
 
         </section>
+        )}
       </div>
 
       {/* PDF PRINT DESIGN AREA (HIDDEN FROM VIEWPORT, USED ONLY FOR html2pdf EXPORT) */}
@@ -1768,6 +2402,302 @@ export default function AdminPortal() {
               <button type="submit" className="bg-champagne-gold text-white px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase hover:brightness-110 shadow-sm">{t('language') === 'es' ? 'Crear' : 'Create'}</button>
             </footer>
           </form>
+        </div>
+      )}
+
+      {/* ADD / EDIT SPECIALIST MODAL */}
+      {showNewSpecModal && (
+        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-soft-ivory rounded-3xl overflow-hidden shadow-2xl border border-champagne-gold/20 flex flex-col max-h-[90vh]">
+            <header className="bg-white px-6 py-4 border-b border-champagne-gold/15 flex justify-between items-center shrink-0">
+              <span className="font-display text-lg font-bold text-deep-cobalt">
+                {editingSpec 
+                  ? (language === 'es' ? 'Editar Especialista' : 'Edit Specialist') 
+                  : (language === 'es' ? 'Nuevo Especialista' : 'New Specialist')
+                }
+              </span>
+              <button 
+                onClick={() => setShowNewSpecModal(false)}
+                className="text-on-surface-variant hover:text-champagne-gold transition-colors flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </header>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (editingSpec) {
+                  updateSpecialist(editingSpec.id, specForm);
+                  setToastMessage(language === 'es' ? '¡Especialista actualizado!' : 'Specialist updated successfully!');
+                } else {
+                  addSpecialist(specForm);
+                  setToastMessage(language === 'es' ? '¡Especialista registrado!' : 'Specialist registered successfully!');
+                }
+                setTimeout(() => setToastMessage(null), 3000);
+                setShowNewSpecModal(false);
+              }}
+              className="flex-grow overflow-y-auto p-6 space-y-4 text-left"
+            >
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Nombre Completo' : 'Full Name'} *
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Dr. Alejandro Guerrero"
+                  value={specForm.name}
+                  onChange={(e) => setSpecForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    {language === 'es' ? 'Especialidad (EN)' : 'Specialty (EN)'} *
+                  </label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Vascular Surgeon"
+                    value={specForm.title}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    {language === 'es' ? 'Especialidad (ES)' : 'Specialty (ES)'} *
+                  </label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="e.g. Cirujano Vascular"
+                    value={specForm.titleEs}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, titleEs: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    Email *
+                  </label>
+                  <input 
+                    type="email" 
+                    required
+                    placeholder="name@venacomfort.com"
+                    value={specForm.email}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    {language === 'es' ? 'Teléfono' : 'Phone'} *
+                  </label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="786-555-0100"
+                    value={specForm.phone}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    {language === 'es' ? 'Horario (EN)' : 'Schedule (EN)'}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Mon - Fri"
+                    value={specForm.schedule}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, schedule: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                    {language === 'es' ? 'Horario (ES)' : 'Schedule (ES)'}
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Lun - Vie"
+                    value={specForm.scheduleEs}
+                    onChange={(e) => setSpecForm(prev => ({ ...prev, scheduleEs: e.target.value }))}
+                    className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Foto del Especialista' : 'Specialist Photo'}
+                </label>
+                <div className="flex items-center gap-4 mt-2">
+                  <img 
+                    src={specForm.image || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=200'} 
+                    alt="Preview" 
+                    className="w-16 h-16 rounded-full object-cover border border-champagne-gold/30 bg-surface-dim" 
+                  />
+                  <div className="flex flex-col gap-1">
+                    <label className="bg-deep-cobalt hover:bg-deep-cobalt/95 text-white px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider cursor-pointer shadow-sm text-center inline-block">
+                      <span>{language === 'es' ? 'Seleccionar Imagen' : 'Choose Image'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleSpecPhotoUpload}
+                        className="sr-only" 
+                      />
+                    </label>
+                    <span className="text-[10px] text-on-surface-variant/60">
+                      {language === 'es' ? 'JPG, PNG. Max 5MB (se comprimirá)' : 'JPG, PNG. Max 5MB (will be compressed)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  Status
+                </label>
+                <select
+                  value={specForm.status}
+                  onChange={(e) => setSpecForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold bg-white"
+                >
+                  <option value="Active">{language === 'es' ? 'Activo' : 'Active'}</option>
+                  <option value="Inactive">{language === 'es' ? 'Inactivo' : 'Inactive'}</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-champagne-gold/15 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setShowNewSpecModal(false)}
+                  className="border border-outline-variant text-on-surface-variant px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer font-semibold"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-champagne-gold text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:brightness-110 cursor-pointer font-semibold"
+                >
+                  {language === 'es' ? 'Guardar' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* RESCHEDULE APPOINTMENT MODAL */}
+      {reschedulingApp && (
+        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-soft-ivory rounded-3xl overflow-hidden shadow-2xl border border-champagne-gold/20 flex flex-col">
+            <header className="bg-white px-6 py-4 border-b border-champagne-gold/15 flex justify-between items-center">
+              <span className="font-display text-base font-bold text-deep-cobalt">
+                {language === 'es' ? 'Reagendar Cita' : 'Reschedule Appointment'}
+              </span>
+              <button 
+                onClick={() => setReschedulingApp(null)}
+                className="text-on-surface-variant hover:text-champagne-gold transition-colors flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </header>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                rescheduleAppointment(reschedulingApp.id, rescheduleForm);
+                setToastMessage(language === 'es' ? '¡Cita reagendada con éxito!' : 'Appointment rescheduled successfully!');
+                setTimeout(() => setToastMessage(null), 3000);
+                setReschedulingApp(null);
+              }}
+              className="p-6 space-y-4 text-left"
+            >
+              <div>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1">
+                  {language === 'es' ? 'Paciente' : 'Patient'}
+                </span>
+                <span className="font-bold text-deep-cobalt block text-sm">
+                  {reschedulingApp.patientName}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Nueva Fecha' : 'New Date'} *
+                </label>
+                <input 
+                  type="date"
+                  required
+                  value={rescheduleForm.date}
+                  onChange={(e) => setRescheduleForm(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Nueva Hora' : 'New Time'} *
+                </label>
+                <select 
+                  value={rescheduleForm.time}
+                  onChange={(e) => setRescheduleForm(prev => ({ ...prev, time: e.target.value }))}
+                  className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold bg-white"
+                >
+                  <option value="09:00 AM">09:00 AM</option>
+                  <option value="10:00 AM">10:00 AM</option>
+                  <option value="11:00 AM">11:00 AM</option>
+                  <option value="01:00 PM">01:00 PM</option>
+                  <option value="02:00 PM">02:00 PM</option>
+                  <option value="03:00 PM">03:00 PM</option>
+                  <option value="04:00 PM">04:00 PM</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
+                  {language === 'es' ? 'Especialista' : 'Specialist'} *
+                </label>
+                <select
+                  value={rescheduleForm.doctor}
+                  onChange={(e) => setRescheduleForm(prev => ({ ...prev, doctor: e.target.value }))}
+                  className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold bg-white"
+                >
+                  {specialists.filter(s => s.status === 'Active').map(s => (
+                    <option key={s.id} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-champagne-gold/15">
+                <button 
+                  type="button" 
+                  onClick={() => setReschedulingApp(null)}
+                  className="border border-outline-variant text-on-surface-variant px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer font-semibold"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  className="bg-champagne-gold text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider hover:brightness-110 cursor-pointer font-semibold"
+                >
+                  {language === 'es' ? 'Confirmar' : 'Confirm'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
