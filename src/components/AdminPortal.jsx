@@ -165,6 +165,11 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   // Action log state variables
   const [searchLogQuery, setSearchLogQuery] = useState('');
 
+  // Clean DB Modal state variables
+  const [showCleanDbModal, setShowCleanDbModal] = useState(false);
+  const [cleanDbTarget, setCleanDbTarget] = useState('dev'); // 'dev' or 'prod'
+  const [cleanDbConfirmText, setCleanDbConfirmText] = useState('');
+
   // Specialist management state variables
   const [showNewSpecModal, setShowNewSpecModal] = useState(false);
   const [editingSpec, setEditingSpec] = useState(null);
@@ -354,27 +359,30 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     sessionStorage.removeItem('venacomfort_user');
   };
 
-  const handleCleanDb = async () => {
-    const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
-    const firstConfirm = window.confirm(
-      language === 'es'
-        ? `⚠️ ¿Confirmas la eliminación de todos los especialistas y usuarios (excepto el administrador) de la base de datos de ${isProd ? 'PRODUCCIÓN' : 'DESARROLLO'}?`
-        : `⚠️ Do you confirm clearing all specialists and users (except admin) from the ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} database?`
-    );
-    if (firstConfirm) {
-      const secondConfirm = window.confirm(
+  const handleCleanDb = () => {
+    setCleanDbConfirmText('');
+    setCleanDbTarget('dev');
+    setShowCleanDbModal(true);
+  };
+
+  const handleCleanDbSubmit = async (e) => {
+    e.preventDefault();
+    const expectedText = cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO';
+    if (cleanDbConfirmText.trim() !== expectedText) {
+      alert(
         language === 'es'
-          ? '🚨 ADVERTENCIA: Esta acción es completamente irreversible. ¿Seguro que deseas proceder con la limpieza?'
-          : '🚨 WARNING: This action is completely irreversible. Are you absolutely sure you want to proceed with cleanup?'
+          ? `Por favor, escribe exactamente "${expectedText}" para continuar.`
+          : `Please type exactly "${expectedText}" to proceed.`
       );
-      if (secondConfirm) {
-        try {
-          await cleanProductionDb(currentUser);
-          alert(language === 'es' ? 'Limpieza de base de datos completada con éxito.' : 'Database cleanup completed successfully.');
-        } catch (e) {
-          alert((language === 'es' ? 'Error al limpiar base de datos: ' : 'Database cleanup error: ') + e.message);
-        }
-      }
+      return;
+    }
+
+    try {
+      await cleanProductionDb(cleanDbTarget, currentUser);
+      setShowCleanDbModal(false);
+      alert(language === 'es' ? 'Limpieza de base de datos completada con éxito.' : 'Database cleanup completed successfully.');
+    } catch (err) {
+      alert((language === 'es' ? 'Error al limpiar base de datos: ' : 'Database cleanup error: ') + err.message);
     }
   };
 
@@ -3113,6 +3121,115 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                   className="bg-champagne-gold text-white px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase hover:brightness-110 shadow-sm cursor-pointer"
                 >
                   {editingUser ? (language === 'es' ? 'Guardar' : 'Save') : (language === 'es' ? 'Registrar' : 'Register')}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLEAN DB MODAL */}
+      {showCleanDbModal && (
+        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-soft-ivory rounded-3xl overflow-hidden shadow-2xl border border-error/20 flex flex-col max-h-[90vh]">
+            <header className="bg-white px-6 py-4 border-b border-error/15 flex justify-between items-center shrink-0">
+              <span className="font-display text-lg font-bold text-error flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg">cleaning_services</span>
+                {language === 'es' ? 'Limpiar Base de Datos' : 'Clean Database'}
+              </span>
+              <button 
+                onClick={() => setShowCleanDbModal(false)}
+                className="text-on-surface-variant hover:text-error transition-colors flex items-center justify-center cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </header>
+
+            <form onSubmit={handleCleanDbSubmit} className="flex-grow overflow-y-auto p-6 space-y-4 text-left">
+              <div className="p-4 bg-error-container/10 border border-error/20 rounded-2xl text-error text-xs space-y-2">
+                <p className="font-bold">
+                  {language === 'es' ? '🚨 ADVERTENCIA CRÍTICA:' : '🚨 CRITICAL WARNING:'}
+                </p>
+                <p>
+                  {language === 'es' 
+                    ? 'Esta acción eliminará de forma permanente a todos los especialistas clínicos y usuarios (excepto el administrador principal "admin@venacomfort.com") de la base de datos seleccionada.'
+                    : 'This action will permanently delete all clinical specialists and users (except primary administrator "admin@venacomfort.com") from the selected database.'
+                  }
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                  {language === 'es' ? 'Seleccionar Base de Datos' : 'Select Database'} *
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCleanDbTarget('dev')}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
+                      cleanDbTarget === 'dev'
+                        ? 'border-champagne-gold bg-soft-ivory/50 ring-1 ring-champagne-gold'
+                        : 'border-outline-variant/60 hover:bg-white/40'
+                    }`}
+                  >
+                    <span className="block font-bold text-xs text-deep-cobalt">
+                      {language === 'es' ? 'Desarrollo' : 'Development'}
+                    </span>
+                    <span className="block text-[10px] text-outline mt-1 font-mono">
+                      _dev collections
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCleanDbTarget('prod')}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
+                      cleanDbTarget === 'prod'
+                        ? 'border-error bg-error-container/5 ring-1 ring-error'
+                        : 'border-outline-variant/60 hover:bg-white/40'
+                    }`}
+                  >
+                    <span className="block font-bold text-xs text-error">
+                      {language === 'es' ? 'Producción' : 'Production'}
+                    </span>
+                    <span className="block text-[10px] text-outline mt-1 font-mono">
+                      Live collections
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                  {language === 'es' 
+                    ? `Para confirmar, escribe "${cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}"` 
+                    : `To confirm, type "${cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}"`
+                  } *
+                </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder={cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}
+                  value={cleanDbConfirmText}
+                  onChange={(e) => setCleanDbConfirmText(e.target.value)}
+                  className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt uppercase font-mono focus:border-error focus:ring-1 focus:ring-error"
+                />
+              </div>
+
+              <footer className="pt-4 border-t border-ice-blue flex justify-end gap-3 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCleanDbModal(false)}
+                  className="border border-outline-variant text-on-surface-variant hover:bg-outline-variant/15 px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase cursor-pointer"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button 
+                  type="submit" 
+                  className={`px-4 py-2 rounded-lg font-semibold text-xs tracking-wider uppercase hover:brightness-110 shadow-sm cursor-pointer text-white ${
+                    cleanDbTarget === 'prod' ? 'bg-error' : 'bg-champagne-gold'
+                  }`}
+                >
+                  {language === 'es' ? 'Confirmar Limpieza' : 'Confirm Cleanup'}
                 </button>
               </footer>
             </form>

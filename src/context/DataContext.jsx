@@ -969,18 +969,16 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  const cleanProductionDb = async (currentUser) => {
+  const cleanProductionDb = async (targetEnv, currentUser) => {
     try {
-      const isActuallyProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
-      const targetPrefix = isActuallyProd ? '' : '_dev';
+      const targetPrefix = targetEnv === 'prod' ? '' : '_dev';
 
       // Clean Specialists
       const specSnap = await getDocs(collection(db, `specialists${targetPrefix}`));
       for (const d of specSnap.docs) {
         await deleteDoc(doc(db, `specialists${targetPrefix}`, d.id));
       }
-      setSpecialists([]);
-
+      
       // Clean Users
       const userSnap = await getDocs(collection(db, `users${targetPrefix}`));
       for (const d of userSnap.docs) {
@@ -990,9 +988,16 @@ export const DataProvider = ({ children }) => {
         }
         await deleteDoc(doc(db, `users${targetPrefix}`, d.id));
       }
-      setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
 
-      logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron todos los especialistas y usuarios no-admin de la base de datos (${isActuallyProd ? 'PROD' : 'DEV'}).`);
+      // Check if targetPrefix matches active app prefix to sync React state
+      const isActiveDev = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
+      const activePrefix = isActiveDev ? '_dev' : '';
+      if (targetPrefix === activePrefix) {
+        setSpecialists([]);
+        setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
+      }
+
+      logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron todos los especialistas y usuarios no-admin de la base de datos (${targetEnv.toUpperCase()}).`);
       return true;
     } catch (e) {
       console.error("cleanProductionDb error:", e);
