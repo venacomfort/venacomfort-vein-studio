@@ -32,9 +32,11 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
             <a href="#results" onClick={() => setView('landing')} className="text-on-surface font-semibold text-sm nav-link hover:text-champagne-gold transition-colors duration-300">
               {t('beforeAfter')}
             </a>
+            {/* Hiding pricing from desktop menu as requested
             <a href="#pricing" onClick={() => setView('landing')} className="text-on-surface font-semibold text-sm nav-link hover:text-champagne-gold transition-colors duration-300">
               {t('pricing')}
             </a>
+            */}
             <a href="#faq" onClick={() => setView('landing')} className="text-on-surface font-semibold text-sm nav-link hover:text-champagne-gold transition-colors duration-300">
               {t('faq')}
             </a>
@@ -113,6 +115,7 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
             <span className="material-symbols-outlined text-base">compare</span>
             {t('beforeAfter')}
           </a>
+          {/* Hiding pricing from mobile menu as requested
           <a 
             href="#pricing" 
             onClick={() => { setView('landing'); setMobileMenuOpen(false); }}
@@ -121,6 +124,7 @@ export default function Navbar({ currentView, setView, onOpenBooking }) {
             <span className="material-symbols-outlined text-base">payments</span>
             {t('pricing')}
           </a>
+          */}
           <button 
             onClick={() => { setView(currentView === 'admin' ? 'landing' : 'admin'); setMobileMenuOpen(false); }}
             className="text-on-surface-variant hover:bg-champagne-gold/10 rounded-lg mx-2 px-4 py-3 font-semibold text-sm flex items-center gap-3 transition-all text-left w-full"

@@ -56,6 +56,7 @@ export default function App() {
               <span className="material-symbols-outlined text-lg">compare</span>
               <span>{t('beforeAfter')}</span>
             </button>
+            {/* Hiding pricing from admin drawer as requested
             <button 
               onClick={() => { setView('landing'); setTimeout(() => { window.location.hash = 'pricing'; }, 100); }} 
               className="w-full flex items-center gap-4 text-on-surface-variant hover:bg-champagne-gold/10 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer"
@@ -63,6 +64,7 @@ export default function App() {
               <span className="material-symbols-outlined text-lg">payments</span>
               <span>{t('pricing')}</span>
             </button>
+            */}
             <div className="border-t border-surface-dim my-4 pt-4 px-2">
               <button 
                 className="w-full flex items-center gap-4 bg-champagne-gold/10 text-deep-cobalt rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left border-l-4 border-champagne-gold"
@@ -103,8 +105,8 @@ export default function App() {
         {/* Before and After Comparatives */}
         <BeforeAfter />
 
-        {/* Prices list and value props */}
-        <Pricing onOpenBooking={() => setBookingOpen(true)} />
+        {/* Prices list and value props - hidden for now as requested */}
+        {/* <Pricing onOpenBooking={() => setBookingOpen(true)} /> */}
 
         {/* Interactive Bilingual FAQs */}
         <section className="py-24 md:py-32 bg-soft-ivory" id="faq">
