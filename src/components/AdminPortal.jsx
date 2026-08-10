@@ -802,8 +802,20 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 </button>
                 <button
                   onClick={() => {
-                    if (window.confirm(language === 'es' ? '¿Estás seguro de eliminar este especialista?' : 'Are you sure you want to delete this specialist?')) {
-                      deleteSpecialist(spec.id);
+                    const firstConfirm = window.confirm(
+                      language === 'es' 
+                        ? '¿Estás seguro de que deseas eliminar este especialista?' 
+                        : 'Are you sure you want to delete this specialist?'
+                    );
+                    if (firstConfirm) {
+                      const secondConfirm = window.confirm(
+                        language === 'es'
+                          ? '⚠️ ADVERTENCIA: Esta acción es irreversible y eliminará permanentemente al especialista de los registros clínicos. ¿Confirmas la eliminación definitiva?'
+                          : '⚠️ WARNING: This action is irreversible and will permanently delete the specialist from all clinical records. Do you confirm the final deletion?'
+                      );
+                      if (secondConfirm) {
+                        deleteSpecialist(spec.id);
+                      }
                     }
                   }}
                   className="text-on-surface-variant/40 hover:text-error px-1.5 py-1.5 rounded cursor-pointer"
