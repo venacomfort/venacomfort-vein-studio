@@ -147,6 +147,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     addUser,
     updateUser,
     deleteUser,
+    cleanProductionDb,
     logAction
   } = useData();
 
@@ -351,6 +352,30 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     setCurrentUser(null);
     sessionStorage.removeItem('venacomfort_auth');
     sessionStorage.removeItem('venacomfort_user');
+  };
+
+  const handleCleanDb = async () => {
+    const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+    const firstConfirm = window.confirm(
+      language === 'es'
+        ? `⚠️ ¿Confirmas la eliminación de todos los especialistas y usuarios (excepto el administrador) de la base de datos de ${isProd ? 'PRODUCCIÓN' : 'DESARROLLO'}?`
+        : `⚠️ Do you confirm clearing all specialists and users (except admin) from the ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'} database?`
+    );
+    if (firstConfirm) {
+      const secondConfirm = window.confirm(
+        language === 'es'
+          ? '🚨 ADVERTENCIA: Esta acción es completamente irreversible. ¿Seguro que deseas proceder con la limpieza?'
+          : '🚨 WARNING: This action is completely irreversible. Are you absolutely sure you want to proceed with cleanup?'
+      );
+      if (secondConfirm) {
+        try {
+          await cleanProductionDb(currentUser);
+          alert(language === 'es' ? 'Limpieza de base de datos completada con éxito.' : 'Database cleanup completed successfully.');
+        } catch (e) {
+          alert((language === 'es' ? 'Error al limpiar base de datos: ' : 'Database cleanup error: ') + e.message);
+        }
+      }
+    }
   };
 
   // Filter patients
@@ -751,17 +776,26 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
               className="w-full pl-10 pr-4 py-2 bg-soft-ivory/20 rounded-lg border border-outline-variant focus:border-champagne-gold focus:ring-1 focus:ring-champagne-gold text-sm text-on-surface"
             />
           </div>
-          <button 
-            onClick={() => {
-              setUserForm({ name: '', email: '', password: '', role: 'specialist' });
-              setEditingUser(null);
-              setShowNewUserModal(true);
-            }}
-            className="bg-deep-cobalt hover:bg-deep-cobalt/95 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md self-start md:self-auto"
-          >
-            <span className="material-symbols-outlined text-sm">person_add</span>
-            {language === 'es' ? 'Nuevo Usuario' : 'New User'}
-          </button>
+          <div className="flex gap-3 self-start md:self-auto flex-wrap">
+            <button 
+              onClick={handleCleanDb}
+              className="border border-error/30 hover:bg-error-container/10 text-error px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-sm">cleaning_services</span>
+              {language === 'es' ? 'Limpiar BD' : 'Clean DB'}
+            </button>
+            <button 
+              onClick={() => {
+                setUserForm({ name: '', email: '', password: '', role: 'specialist' });
+                setEditingUser(null);
+                setShowNewUserModal(true);
+              }}
+              className="bg-deep-cobalt hover:bg-deep-cobalt/95 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md"
+            >
+              <span className="material-symbols-outlined text-sm">person_add</span>
+              {language === 'es' ? 'Nuevo Usuario' : 'New User'}
+            </button>
+          </div>
         </div>
 
         {/* Users list grid */}

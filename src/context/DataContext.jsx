@@ -969,6 +969,37 @@ export const DataProvider = ({ children }) => {
     }
   };
 
+  const cleanProductionDb = async (currentUser) => {
+    try {
+      const isActuallyProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+      const targetPrefix = isActuallyProd ? '' : '_dev';
+
+      // Clean Specialists
+      const specSnap = await getDocs(collection(db, `specialists${targetPrefix}`));
+      for (const d of specSnap.docs) {
+        await deleteDoc(doc(db, `specialists${targetPrefix}`, d.id));
+      }
+      setSpecialists([]);
+
+      // Clean Users
+      const userSnap = await getDocs(collection(db, `users${targetPrefix}`));
+      for (const d of userSnap.docs) {
+        const data = d.data();
+        if (data.email?.toLowerCase() === 'admin@venacomfort.com') {
+          continue;
+        }
+        await deleteDoc(doc(db, `users${targetPrefix}`, d.id));
+      }
+      setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
+
+      logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron todos los especialistas y usuarios no-admin de la base de datos (${isActuallyProd ? 'PROD' : 'DEV'}).`);
+      return true;
+    } catch (e) {
+      console.error("cleanProductionDb error:", e);
+      throw e;
+    }
+  };
+
   // Audit Action Logger
   const logAction = (userName, action, details) => {
     const newLog = {
@@ -1008,6 +1039,7 @@ export const DataProvider = ({ children }) => {
       addUser,
       updateUser,
       deleteUser,
+      cleanProductionDb,
       logAction
     }}>
       {children}
