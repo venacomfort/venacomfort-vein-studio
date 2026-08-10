@@ -16,18 +16,6 @@ const defaultSpecialists = [
     scheduleEs: 'Lun - Vie',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmFlvCGywaT-W4-dIbbWMP8IqY3-KNASyMcjp4sn_v17Te9vY81ut7cojgvOOAQtLpF-Gy4REDJOZk1PpiZEnyM-s7JeTIBqUhjnzzy4HaqUUtt_Cla9djQ62nuF3dJQ804xhNJi-dTU_TtcMwfFyo9kqsHe_RdugDAUTG_tVecvEHi25aa4G3cL6v97p3kHjEdBSXXbfu2uSyjn8f0lO5A5CFpFOTGvaqtDsqRG--U9h9Gt8OlN1JRA',
     status: 'Active'
-  },
-  {
-    id: 'doc-2',
-    name: 'Dr. James Chen',
-    title: 'Phlebologist',
-    titleEs: 'Flebólogo',
-    email: 'james.chen@venacomfort.com',
-    phone: '786-555-0244',
-    schedule: 'Mon - Wed',
-    scheduleEs: 'Lun - Mié',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDuiyzJYn02CAMKE5t7-BD2CZfuqdLQgdyD2dcOyyrWhZGazVivbXNpQ0HMICewLWTHIniLVe9vp5-3yZH8aHhdn3GzTRLSfE5FJmExHm-jdrzUE4VeWkG_JUDRN2Hzvhet8vKbaPKrV5pIapGgIhZMxF93MoOC7pxO5QHGxfUeTCaeOOIKqtgaJw3YONOhAkApVLaBFD_7JFQGXJx2UfRuH5QykR8CbFG_XpwPR53MuhnOJu-UJw5ZMw',
-    status: 'Active'
   }
 ];
 
