@@ -119,18 +119,6 @@ export default function App() {
                     <span className="material-symbols-outlined text-lg">groups</span>
                     <span>{language === 'es' ? 'Especialistas' : 'Specialists'}</span>
                   </button>
-
-                  <button 
-                    onClick={() => setAdminSubView('users')}
-                    className={`w-full flex items-center gap-4 rounded-lg px-4 py-3 font-semibold text-xs tracking-wider uppercase transition-all text-left cursor-pointer ${
-                      adminSubView === 'users' 
-                        ? 'bg-champagne-gold/10 text-deep-cobalt border-l-4 border-champagne-gold' 
-                        : 'text-on-surface-variant hover:bg-champagne-gold/10'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-lg">manage_accounts</span>
-                    <span>{language === 'es' ? 'Usuarios' : 'Users'}</span>
-                  </button>
                 </>
               )}
             </div>
@@ -144,6 +132,17 @@ export default function App() {
                   <div className="absolute bottom-16 left-4 right-4 bg-white border border-outline-variant/60 rounded-2xl shadow-xl p-2 z-50 flex flex-col gap-1 text-left animate-in fade-in slide-in-from-bottom-2 duration-150">
                     {currentUser?.role === 'admin' && (
                       <>
+                        <button
+                          onClick={() => {
+                            setAdminSubView('users');
+                            setShowUserMenu(false);
+                          }}
+                          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-champagne-gold/10 cursor-pointer w-full text-left transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-base">manage_accounts</span>
+                          <span>{language === 'es' ? 'Gestión de Usuarios' : 'Users Management'}</span>
+                        </button>
+                        <hr className="border-ice-blue/50 my-1" />
                         <button
                           onClick={() => {
                             setAdminSubView('audit_logs');
