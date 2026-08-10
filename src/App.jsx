@@ -129,17 +129,21 @@ export default function App() {
                 {/* Dropdown Menu */}
                 {showUserMenu && (
                   <div className="absolute bottom-16 left-4 right-4 bg-white border border-outline-variant/60 rounded-2xl shadow-xl p-2 z-50 flex flex-col gap-1 text-left animate-in fade-in slide-in-from-bottom-2 duration-150">
-                    <button
-                      onClick={() => {
-                        setAdminSubView('audit_logs');
-                        setShowUserMenu(false);
-                      }}
-                      className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-champagne-gold/10 cursor-pointer w-full text-left transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-base">history</span>
-                      <span>{language === 'es' ? 'Registro de Acciones' : 'Action Logs'}</span>
-                    </button>
-                    <hr className="border-ice-blue/50 my-1" />
+                    {currentUser?.role === 'admin' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setAdminSubView('audit_logs');
+                            setShowUserMenu(false);
+                          }}
+                          className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-champagne-gold/10 cursor-pointer w-full text-left transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-base">history</span>
+                          <span>{language === 'es' ? 'Registro de Acciones' : 'Action Logs'}</span>
+                        </button>
+                        <hr className="border-ice-blue/50 my-1" />
+                      </>
+                    )}
                     <button
                       onClick={() => {
                         setIsAuthenticated(false);

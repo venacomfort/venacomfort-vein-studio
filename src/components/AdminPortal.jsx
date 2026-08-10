@@ -317,6 +317,15 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     }
   }, [specialists]);
 
+  // Security role check
+  useEffect(() => {
+    if (isAuthenticated && currentUser?.role === 'specialist') {
+      if (adminSubView === 'users' || adminSubView === 'audit_logs' || adminSubView === 'specialists') {
+        setAdminSubView('patients');
+      }
+    }
+  }, [adminSubView, currentUser, isAuthenticated]);
+
   // Auth Handler
   const handleLogin = (e) => {
     e.preventDefault();
@@ -1038,28 +1047,30 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 >
                   {spec.status === 'Active' ? (language === 'es' ? 'Desactivar' : 'Deactivate') : (language === 'es' ? 'Activar' : 'Activate')}
                 </button>
-                <button
-                  onClick={() => {
-                    const firstConfirm = window.confirm(
-                      language === 'es' 
-                        ? '¿Estás seguro de que deseas eliminar este especialista?' 
-                        : 'Are you sure you want to delete this specialist?'
-                    );
-                    if (firstConfirm) {
-                      const secondConfirm = window.confirm(
-                        language === 'es'
-                          ? '⚠️ ADVERTENCIA: Esta acción es irreversible y eliminará permanentemente al especialista de los registros clínicos. ¿Confirmas la eliminación definitiva?'
-                          : '⚠️ WARNING: This action is irreversible and will permanently delete the specialist from all clinical records. Do you confirm the final deletion?'
+                {currentUser?.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      const firstConfirm = window.confirm(
+                        language === 'es' 
+                          ? '¿Estás seguro de que deseas eliminar este especialista?' 
+                          : 'Are you sure you want to delete this specialist?'
                       );
-                      if (secondConfirm) {
-                        deleteSpecialist(spec.id);
+                      if (firstConfirm) {
+                        const secondConfirm = window.confirm(
+                          language === 'es'
+                            ? '⚠️ ADVERTENCIA: Esta acción es irreversible y eliminará permanentemente al especialista de los registros clínicos. ¿Confirmas la eliminación definitiva?'
+                            : '⚠️ WARNING: This action is irreversible and will permanently delete the specialist from all clinical records. Do you confirm the final deletion?'
+                        );
+                        if (secondConfirm) {
+                          deleteSpecialist(spec.id);
+                        }
                       }
-                    }
-                  }}
-                  className="text-on-surface-variant/40 hover:text-error px-1.5 py-1.5 rounded cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-base">delete</span>
-                </button>
+                    }}
+                    className="text-on-surface-variant/40 hover:text-error px-1.5 py-1.5 rounded cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">delete</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
