@@ -110,7 +110,7 @@ export default function App() {
         <section className="py-24 md:py-32 bg-soft-ivory" id="faq">
           <div className="max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop">
             <div className="text-center max-w-3xl mx-auto mb-16">
-              <img src="/logo.png" alt="FAQ Logo" className="h-12 w-12 mx-auto mb-4 object-contain opacity-80 animate-fade-in" />
+              <img src="/faq-icon.png" alt="FAQ Logo" className="h-12 w-12 mx-auto mb-4 object-contain opacity-90 animate-fade-in" />
               <h2 className="font-display text-3xl md:text-4xl text-deep-cobalt mb-6 font-bold">
                 {t('faqTitle')}
               </h2>
@@ -127,7 +127,7 @@ export default function App() {
                       className="w-full px-6 py-5 flex justify-between items-center text-left hover:bg-champagne-gold/[0.02] transition-colors focus:outline-none cursor-pointer"
                     >
                       <span className="font-display text-base md:text-lg text-deep-cobalt font-semibold flex items-center gap-2.5">
-                        <img src="/logo.png" alt="FAQ Icon" className="h-5 w-5 object-contain shrink-0 opacity-70" />
+                        <img src="/faq-icon.png" alt="FAQ Icon" className="h-5 w-5 object-contain shrink-0 opacity-80" />
                         {t(faq.qKey)}
                       </span>
                       <span className={`material-symbols-outlined text-champagne-gold transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
