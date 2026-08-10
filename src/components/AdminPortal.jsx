@@ -1063,12 +1063,14 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                         );
                         if (secondConfirm) {
                           deleteSpecialist(spec.id);
+                          logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista: ${spec.name} (${spec.email})`);
                         }
                       }
                     }}
-                    className="text-on-surface-variant/40 hover:text-error px-1.5 py-1.5 rounded cursor-pointer"
+                    className="border border-error/25 text-error hover:bg-error-container/20 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
                   >
-                    <span className="material-symbols-outlined text-base">delete</span>
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                    {language === 'es' ? 'Eliminar' : 'Delete'}
                   </button>
                 )}
               </div>
