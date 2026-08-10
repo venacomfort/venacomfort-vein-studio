@@ -1019,17 +1019,6 @@ export const DataProvider = ({ children }) => {
         }
       }
 
-      // 5. Clean Audit Logs
-      if (options.auditLogs) {
-        const logSnap = await getDocs(collection(db, `audit_logs${targetPrefix}`));
-        for (const d of logSnap.docs) {
-          await deleteDoc(doc(db, `audit_logs${targetPrefix}`, d.id));
-        }
-        if (isTargetActive) {
-          setAuditLogs([]);
-        }
-      }
-
       const collectionsCleaned = Object.keys(options).filter(k => options[k]).join(', ');
       logAction(currentUser?.name || 'Admin', 'Limpieza BD', `Se eliminaron datos de las colecciones (${collectionsCleaned}) en el entorno ${targetEnv.toUpperCase()}.`);
       return true;

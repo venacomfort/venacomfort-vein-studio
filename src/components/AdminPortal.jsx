@@ -173,8 +173,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     specialists: false,
     users: false,
     patients: false,
-    appointments: false,
-    auditLogs: false
+    appointments: false
   });
 
   // Specialist management state variables
@@ -373,8 +372,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       specialists: false,
       users: false,
       patients: false,
-      appointments: false,
-      auditLogs: false
+      appointments: false
     });
     setShowCleanDbModal(true);
   };
@@ -3283,18 +3281,6 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                     />
                     <span>
                       {language === 'es' ? 'Citas Agendadas' : 'Scheduled Appointments'}
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-3 text-xs font-semibold text-deep-cobalt cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cleanDbCollections.auditLogs}
-                      onChange={(e) => setCleanDbCollections(prev => ({ ...prev, auditLogs: e.target.checked }))}
-                      className="rounded border-outline-variant text-error focus:ring-error"
-                    />
-                    <span>
-                      {language === 'es' ? 'Historial de Auditoría' : 'Audit Log History'}
                     </span>
                   </label>
                 </div>
