@@ -1361,12 +1361,6 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           >
             {t('newPatient')}
           </button>
-          <button 
-            onClick={handleLogout}
-            className="border border-outline-variant text-on-surface-variant hover:text-error hover:border-error px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer"
-          >
-            Logout
-          </button>
         </div>
       </header>
 
