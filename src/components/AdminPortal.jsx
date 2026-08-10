@@ -851,9 +851,9 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                   <span className="material-symbols-outlined text-sm">edit</span>
                   {language === 'es' ? 'Editar' : 'Edit'}
                 </button>
-                {u.id !== 'user-admin' && u.email !== currentUser?.email && (
+                {currentUser?.role === 'admin' && u.id !== 'user-admin' && u.email !== currentUser?.email && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const first = window.confirm(language === 'es' ? '¿Eliminar este usuario?' : 'Delete this user?');
                       if (first) {
                         const second = window.confirm(
@@ -862,8 +862,13 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                             : '⚠️ WARNING: This will permanently delete the access account and its linked specialist. Confirm?'
                         );
                         if (second) {
-                          deleteUser(u.id);
-                          logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta: ${u.email} (${u.name})`);
+                          try {
+                            await deleteUser(u.id);
+                            logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta: ${u.email} (${u.name})`);
+                            alert(language === 'es' ? 'Usuario eliminado correctamente.' : 'User deleted successfully.');
+                          } catch (err) {
+                            alert((language === 'es' ? 'Error al eliminar usuario: ' : 'Error deleting user: ') + err.message);
+                          }
                         }
                       }
                     }}
@@ -1091,7 +1096,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 </button>
                 {currentUser?.role === 'admin' && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const firstConfirm = window.confirm(
                         language === 'es' 
                           ? '¿Estás seguro de que deseas eliminar este especialista?' 
@@ -1104,8 +1109,13 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                             : '⚠️ WARNING: This action is irreversible and will permanently delete the specialist from all clinical records. Do you confirm the final deletion?'
                         );
                         if (secondConfirm) {
-                          deleteSpecialist(spec.id);
-                          logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista: ${spec.name} (${spec.email})`);
+                          try {
+                            await deleteSpecialist(spec.id);
+                            logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista: ${spec.name} (${spec.email})`);
+                            alert(language === 'es' ? 'Especialista eliminado correctamente.' : 'Specialist deleted successfully.');
+                          } catch (err) {
+                            alert((language === 'es' ? 'Error al eliminar especialista: ' : 'Error deleting specialist: ') + err.message);
+                          }
                         }
                       }
                     }}

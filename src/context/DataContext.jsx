@@ -402,11 +402,7 @@ export const DataProvider = ({ children }) => {
   };
 
   const deleteSpecialistFromCloud = async (specId) => {
-    try {
-      await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
-    } catch (error) {
-      console.error("Firestore deleteSpecialistFromCloud error:", error);
-    }
+    await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
   };
 
   const saveUserToCloud = async (userData) => {
@@ -418,11 +414,7 @@ export const DataProvider = ({ children }) => {
   };
 
   const deleteUserFromCloud = async (userId) => {
-    try {
-      await deleteDoc(doc(db, COLL_USERS, userId));
-    } catch (e) {
-      console.error("Firestore deleteUserFromCloud error:", e);
-    }
+    await deleteDoc(doc(db, COLL_USERS, userId));
   };
 
   const saveAuditLogToCloud = async (logData) => {
@@ -845,16 +837,18 @@ export const DataProvider = ({ children }) => {
   };
 
   // Delete Specialist
-  const deleteSpecialist = (specId) => {
-    setSpecialists(prev => prev.filter(s => s.id !== specId));
-    deleteSpecialistFromCloud(specId);
-
-    // Sync to users
+  const deleteSpecialist = async (specId) => {
+    // Sync to users (find before deletion)
     const linkedUser = users.find(u => u.specialistId === specId);
+    
+    // Attempt Firestore deletes
+    await deleteSpecialistFromCloud(specId);
     if (linkedUser) {
+      await deleteUserFromCloud(linkedUser.id);
       setUsers(prev => prev.filter(u => u.id !== linkedUser.id));
-      deleteUserFromCloud(linkedUser.id);
     }
+
+    setSpecialists(prev => prev.filter(s => s.id !== specId));
   };
 
   // User Management
@@ -958,15 +952,16 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  const deleteUser = (userId) => {
+  const deleteUser = async (userId) => {
     const user = users.find(u => u.id === userId);
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    deleteUserFromCloud(userId);
+    await deleteUserFromCloud(userId);
 
     if (user && user.specialistId) {
+      await deleteSpecialistFromCloud(user.specialistId);
       setSpecialists(prev => prev.filter(s => s.id !== user.specialistId));
-      deleteSpecialistFromCloud(user.specialistId);
     }
+
+    setUsers(prev => prev.filter(u => u.id !== userId));
   };
 
   const cleanProductionDb = async (targetEnv, currentUser) => {
