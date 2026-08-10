@@ -255,7 +255,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId);
 
-  // Sync states on patient change
+  // Reset states on patient change
   useEffect(() => {
     if (selectedPatient) {
       setSoap({
@@ -278,11 +278,17 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       setSelectedPhotosToCompare([]);
       setCompareMode(false);
       setIsEditingPatient(false);
-      setEditPatientData({ ...selectedPatient });
       setEditingSoapNoteId(null);
-      setAdminSocialConsentLevel(selectedPatient.socialMediaConsentLevel || 'level1');
     }
   }, [selectedPatientId]);
+
+  // Keep edit state updated with fresh database data (including signatures)
+  useEffect(() => {
+    if (selectedPatient && !isEditingPatient) {
+      setEditPatientData({ ...selectedPatient });
+      setAdminSocialConsentLevel(selectedPatient.socialMediaConsentLevel || 'level1');
+    }
+  }, [selectedPatient, isEditingPatient]);
 
   useEffect(() => {
     const activeDoc = specialists.find(s => s.status === 'Active');

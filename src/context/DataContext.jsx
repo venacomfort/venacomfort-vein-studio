@@ -167,15 +167,22 @@ const initialPatients = [
   }
 ];
 
+const isProd = import.meta.env.PROD || window.location.hostname !== 'localhost';
+const COLL_PATIENTS = isProd ? "patients" : "patients_dev";
+const COLL_APPOINTMENTS = isProd ? "appointments" : "appointments_dev";
+const COLL_SPECIALISTS = isProd ? "specialists" : "specialists_dev";
+
 export const DataProvider = ({ children }) => {
   const [patients, setPatients] = useState(() => {
-    const saved = localStorage.getItem('venacomfort_patients');
-    return saved ? JSON.parse(saved) : initialPatients;
+    const saved = localStorage.getItem(isProd ? 'venacomfort_patients' : 'venacomfort_patients_dev');
+    if (saved) return JSON.parse(saved);
+    return isProd ? [] : initialPatients;
   });
 
   const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem('venacomfort_appointments');
+    const saved = localStorage.getItem(isProd ? 'venacomfort_appointments' : 'venacomfort_appointments_dev');
     if (saved) return JSON.parse(saved);
+    if (isProd) return [];
     const apps = [];
     initialPatients.forEach(p => {
       p.appointments.forEach(app => {
@@ -190,7 +197,7 @@ export const DataProvider = ({ children }) => {
   });
 
   const [specialists, setSpecialists] = useState(() => {
-    const saved = localStorage.getItem('venacomfort_specialists');
+    const saved = localStorage.getItem(isProd ? 'venacomfort_specialists' : 'venacomfort_specialists_dev');
     return saved ? JSON.parse(saved) : defaultSpecialists;
   });
 
@@ -198,32 +205,40 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     const loadCloudData = async () => {
       try {
-        const patientSnap = await getDocs(collection(db, "patients"));
-        const appSnap = await getDocs(collection(db, "appointments"));
-        const specSnap = await getDocs(collection(db, "specialists"));
+        const patientSnap = await getDocs(collection(db, COLL_PATIENTS));
+        const appSnap = await getDocs(collection(db, COLL_APPOINTMENTS));
+        const specSnap = await getDocs(collection(db, COLL_SPECIALISTS));
         
         if (patientSnap.empty) {
-          // Seed patients
-          const seedPromises = initialPatients.map(p => {
-            return setDoc(doc(db, "patients", p.id), p);
-          });
-          
-          // Seed appointments
-          const apps = [];
-          initialPatients.forEach(p => {
-            p.appointments.forEach(app => {
-              const a = {
-                ...app,
-                patientId: p.id,
-                patientName: `${p.firstName} ${p.lastName}`
-              };
-              apps.push(a);
-              seedPromises.push(setDoc(doc(db, "appointments", a.id), a));
+          if (!isProd) {
+            // Seed patients and appointments in development ONLY!
+            const seedPromises = initialPatients.map(p => {
+              return setDoc(doc(db, COLL_PATIENTS, p.id), p);
             });
-          });
-          
-          await Promise.all(seedPromises);
-          console.log("Cloud Firestore seeded with default clinic data successfully!");
+            
+            const apps = [];
+            initialPatients.forEach(p => {
+              p.appointments.forEach(app => {
+                const a = {
+                  ...app,
+                  patientId: p.id,
+                  patientName: `${p.firstName} ${p.lastName}`
+                };
+                apps.push(a);
+                seedPromises.push(setDoc(doc(db, COLL_APPOINTMENTS, a.id), a));
+              });
+            });
+            
+            await Promise.all(seedPromises);
+            console.log("Cloud Firestore seeded with default clinic data successfully (development)!");
+            setPatients(initialPatients);
+            setAppointments(apps);
+          } else {
+            // Production starts completely clean!
+            setPatients([]);
+            setAppointments([]);
+            console.log("Production database is empty and clean. No mock data seeded.");
+          }
         } else {
           const cloudPatients = [];
           patientSnap.forEach(d => {
@@ -237,16 +252,17 @@ export const DataProvider = ({ children }) => {
           
           setPatients(cloudPatients);
           setAppointments(cloudApps);
-          console.log("Cloud Firestore patients and appointments loaded successfully!");
+          console.log(`Cloud Firestore patients and appointments loaded successfully from ${isProd ? 'production' : 'development'}!`);
         }
 
         if (specSnap.empty) {
-          // Seed specialists
+          // Seed specialists in both dev and prod so appointments booking doesn't crash on empty select
           const specPromises = defaultSpecialists.map(s => {
-            return setDoc(doc(db, "specialists", s.id), s);
+            return setDoc(doc(db, COLL_SPECIALISTS, s.id), s);
           });
           await Promise.all(specPromises);
           console.log("Cloud Firestore specialists seeded successfully!");
+          setSpecialists(defaultSpecialists);
         } else {
           const cloudSpecs = [];
           specSnap.forEach(d => {
@@ -265,7 +281,7 @@ export const DataProvider = ({ children }) => {
   // Sync to local storage as safety cache
   useEffect(() => {
     try {
-      localStorage.setItem('venacomfort_patients', JSON.stringify(patients));
+      localStorage.setItem(isProd ? 'venacomfort_patients' : 'venacomfort_patients_dev', JSON.stringify(patients));
     } catch (e) {
       console.error("Local storage sync error:", e);
       if (e.name === 'QuotaExceededError') {
@@ -276,7 +292,7 @@ export const DataProvider = ({ children }) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('venacomfort_appointments', JSON.stringify(appointments));
+      localStorage.setItem(isProd ? 'venacomfort_appointments' : 'venacomfort_appointments_dev', JSON.stringify(appointments));
     } catch (e) {
       console.error("Local storage appts sync error:", e);
     }
@@ -284,7 +300,7 @@ export const DataProvider = ({ children }) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('venacomfort_specialists', JSON.stringify(specialists));
+      localStorage.setItem(isProd ? 'venacomfort_specialists' : 'venacomfort_specialists_dev', JSON.stringify(specialists));
     } catch (e) {
       console.error("Local storage specialists sync error:", e);
     }
@@ -293,7 +309,7 @@ export const DataProvider = ({ children }) => {
   // Firestore background helper functions
   const savePatientToCloud = async (patient) => {
     try {
-      await setDoc(doc(db, "patients", patient.id), patient);
+      await setDoc(doc(db, COLL_PATIENTS, patient.id), patient);
     } catch (error) {
       console.error("Firestore savePatientToCloud error:", error);
     }
@@ -301,7 +317,7 @@ export const DataProvider = ({ children }) => {
 
   const saveAppToCloud = async (app) => {
     try {
-      await setDoc(doc(db, "appointments", app.id), app);
+      await setDoc(doc(db, COLL_APPOINTMENTS, app.id), app);
     } catch (error) {
       console.error("Firestore saveAppToCloud error:", error);
     }
@@ -309,7 +325,7 @@ export const DataProvider = ({ children }) => {
 
   const deleteAppFromCloud = async (appId) => {
     try {
-      await deleteDoc(doc(db, "appointments", appId));
+      await deleteDoc(doc(db, COLL_APPOINTMENTS, appId));
     } catch (error) {
       console.error("Firestore deleteAppFromCloud error:", error);
     }
@@ -317,7 +333,7 @@ export const DataProvider = ({ children }) => {
 
   const saveSpecialistToCloud = async (spec) => {
     try {
-      await setDoc(doc(db, "specialists", spec.id), spec);
+      await setDoc(doc(db, COLL_SPECIALISTS, spec.id), spec);
     } catch (error) {
       console.error("Firestore saveSpecialistToCloud error:", error);
     }
@@ -325,7 +341,7 @@ export const DataProvider = ({ children }) => {
 
   const deleteSpecialistFromCloud = async (specId) => {
     try {
-      await deleteDoc(doc(db, "specialists", specId));
+      await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
     } catch (error) {
       console.error("Firestore deleteSpecialistFromCloud error:", error);
     }
