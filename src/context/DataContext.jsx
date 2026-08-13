@@ -216,7 +216,9 @@ export const DataProvider = ({ children }) => {
   });
 
   // Sync cloud database on mount (load and seed if empty)
+  // Only run when dbMode === 'cloud' to avoid clobbering local-only state
   useEffect(() => {
+    if (dbMode !== 'cloud') return;
     const loadCloudData = async () => {
       try {
         const patientSnap = await getDocs(collection(db, COLL_PATIENTS));
@@ -329,7 +331,7 @@ export const DataProvider = ({ children }) => {
       }
     };
     loadCloudData();
-  }, []);
+  }, [dbMode]);
 
   // Sync to local storage as safety cache
   useEffect(() => {
@@ -417,7 +419,11 @@ export const DataProvider = ({ children }) => {
   };
 
   const deleteSpecialistFromCloud = async (specId) => {
-    await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
+    try {
+      await deleteDoc(doc(db, COLL_SPECIALISTS, specId));
+    } catch (e) {
+      console.error("Firestore deleteSpecialistFromCloud error:", e);
+    }
   };
 
   const saveUserToCloud = async (userData) => {
@@ -429,7 +435,11 @@ export const DataProvider = ({ children }) => {
   };
 
   const deleteUserFromCloud = async (userId) => {
-    await deleteDoc(doc(db, COLL_USERS, userId));
+    try {
+      await deleteDoc(doc(db, COLL_USERS, userId));
+    } catch (e) {
+      console.error("Firestore deleteUserFromCloud error:", e);
+    }
   };
 
   const saveAuditLogToCloud = async (logData) => {
