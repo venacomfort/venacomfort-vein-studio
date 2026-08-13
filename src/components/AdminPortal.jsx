@@ -178,6 +178,10 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     appointments: false
   });
 
+  // Delete confirmation modal state
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  // deleteConfirm = { type: 'user'|'specialist', id, name } or null
+
   // Specialist management state variables
   const [showNewSpecModal, setShowNewSpecModal] = useState(false);
   const [editingSpec, setEditingSpec] = useState(null);
@@ -982,25 +986,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 </button>
                 {currentUser?.role === 'admin' && u.id !== 'user-admin' && u.email !== currentUser?.email && (
                   <button
-                    onClick={async () => {
-                      const first = window.confirm(language === 'es' ? '¿Eliminar este usuario?' : 'Delete this user?');
-                      if (first) {
-                        const second = window.confirm(
-                          language === 'es'
-                            ? '⚠️ ADVERTENCIA: Esta acción eliminará la cuenta de acceso y su especialista vinculado de forma permanente. ¿Confirmas?'
-                            : '⚠️ WARNING: This will permanently delete the access account and its linked specialist. Confirm?'
-                        );
-                        if (second) {
-                          try {
-                            await deleteUser(u.id);
-                            logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta: ${u.email} (${u.name})`);
-                            alert(language === 'es' ? 'Usuario eliminado correctamente.' : 'User deleted successfully.');
-                          } catch (err) {
-                            alert((language === 'es' ? 'Error al eliminar usuario: ' : 'Error deleting user: ') + err.message);
-                          }
-                        }
-                      }
-                    }}
+                    onClick={() => setDeleteConfirm({ type: 'user', id: u.id, name: u.name })}
                     className="text-xs font-bold text-error hover:text-error/85 transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-sm">delete</span>
@@ -1225,29 +1211,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 </button>
                 {currentUser?.role === 'admin' && (
                   <button
-                    onClick={async () => {
-                      const firstConfirm = window.confirm(
-                        language === 'es' 
-                          ? '¿Estás seguro de que deseas eliminar este especialista?' 
-                          : 'Are you sure you want to delete this specialist?'
-                      );
-                      if (firstConfirm) {
-                        const secondConfirm = window.confirm(
-                          language === 'es'
-                            ? '⚠️ ADVERTENCIA: Esta acción es irreversible y eliminará permanentemente al especialista de los registros clínicos. ¿Confirmas la eliminación definitiva?'
-                            : '⚠️ WARNING: This action is irreversible and will permanently delete the specialist from all clinical records. Do you confirm the final deletion?'
-                        );
-                        if (secondConfirm) {
-                          try {
-                            await deleteSpecialist(spec.id);
-                            logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista: ${spec.name} (${spec.email})`);
-                            alert(language === 'es' ? 'Especialista eliminado correctamente.' : 'Specialist deleted successfully.');
-                          } catch (err) {
-                            alert((language === 'es' ? 'Error al eliminar especialista: ' : 'Error deleting specialist: ') + err.message);
-                          }
-                        }
-                      }
-                    }}
+                    onClick={() => setDeleteConfirm({ type: 'specialist', id: spec.id, name: spec.name })}
                     className="border border-error/25 text-error hover:bg-error-container/20 px-2.5 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <span className="material-symbols-outlined text-[14px]">delete</span>
@@ -3732,6 +3696,63 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
         </div>
       )}
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-error/20 p-8 max-w-sm w-full mx-4 animate-fade-in">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-error text-3xl">delete_forever</span>
+              </div>
+              <div>
+                <p className="font-bold text-on-surface text-base mb-1">
+                  {language === 'es' ? '¿Eliminar permanentemente?' : 'Permanently delete?'}
+                </p>
+                <p className="text-on-surface-variant text-sm">
+                  {language === 'es'
+                    ? `Esta acción eliminará a `
+                    : `This will permanently remove `}
+                  <span className="font-bold text-on-surface">{deleteConfirm.name}</span>
+                  {language === 'es'
+                    ? ` de forma irreversible. ¿Continuar?`
+                    : ` and cannot be undone. Continue?`}
+                </p>
+              </div>
+              <div className="flex gap-3 w-full pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 border border-outline-variant text-on-surface-variant hover:bg-outline-variant/10 px-4 py-2.5 rounded-xl font-semibold text-sm cursor-pointer transition-colors"
+                >
+                  {language === 'es' ? 'Cancelar' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { type, id, name } = deleteConfirm;
+                    setDeleteConfirm(null);
+                    try {
+                      if (type === 'user') {
+                        await deleteUser(id);
+                        logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta eliminada: ${name}`);
+                      } else {
+                        await deleteSpecialist(id);
+                        logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista eliminado: ${name}`);
+                      }
+                    } catch (err) {
+                      console.error('Delete error:', err);
+                    }
+                  }}
+                  className="flex-1 bg-error text-white hover:bg-error/90 px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-colors shadow-md"
+                >
+                  {language === 'es' ? 'Sí, eliminar' : 'Yes, delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+
 }
