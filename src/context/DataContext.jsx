@@ -163,6 +163,13 @@ const COLL_USERS = isProd ? "users" : "users_dev";
 const COLL_AUDIT_LOGS = isProd ? "audit_logs" : "audit_logs_dev";
 
 export const DataProvider = ({ children }) => {
+  const [dbMode, setDbMode] = useState(() => {
+    const saved = localStorage.getItem('venacomfort_db_mode');
+    if (saved) return saved;
+    const isDummy = !import.meta.env.VITE_FIREBASE_API_KEY || import.meta.env.VITE_FIREBASE_API_KEY.includes("DummyKey");
+    return isDummy ? 'local' : 'cloud';
+  });
+
   const [patients, setPatients] = useState(() => {
     const saved = localStorage.getItem(isProd ? 'venacomfort_patients' : 'venacomfort_patients_dev');
     if (saved) return JSON.parse(saved);
@@ -359,6 +366,14 @@ export const DataProvider = ({ children }) => {
       console.error("Local storage users sync error:", e);
     }
   }, [users]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('venacomfort_db_mode', dbMode);
+    } catch (e) {
+      console.error("Local storage dbMode sync error:", e);
+    }
+  }, [dbMode]);
 
   useEffect(() => {
     try {
@@ -842,14 +857,21 @@ export const DataProvider = ({ children }) => {
     // Sync to users (find before deletion)
     const linkedUser = users.find(u => u.specialistId === specId);
     
-    // Attempt Firestore deletes
-    await deleteSpecialistFromCloud(specId);
+    // Update local state instantly (Optimistic UI update)
+    setSpecialists(prev => prev.filter(s => s.id !== specId));
     if (linkedUser) {
-      await deleteUserFromCloud(linkedUser.id);
       setUsers(prev => prev.filter(u => u.id !== linkedUser.id));
     }
 
-    setSpecialists(prev => prev.filter(s => s.id !== specId));
+    // Attempt Firestore deletes in background
+    try {
+      deleteSpecialistFromCloud(specId);
+      if (linkedUser) {
+        deleteUserFromCloud(linkedUser.id);
+      }
+    } catch (error) {
+      console.error("Firestore deleteSpecialist cloud error:", error);
+    }
   };
 
   // User Management
@@ -955,14 +977,22 @@ export const DataProvider = ({ children }) => {
 
   const deleteUser = async (userId) => {
     const user = users.find(u => u.id === userId);
-    await deleteUserFromCloud(userId);
-
+    
+    // Update local state instantly (Optimistic UI update)
+    setUsers(prev => prev.filter(u => u.id !== userId));
     if (user && user.specialistId) {
-      await deleteSpecialistFromCloud(user.specialistId);
       setSpecialists(prev => prev.filter(s => s.id !== user.specialistId));
     }
 
-    setUsers(prev => prev.filter(u => u.id !== userId));
+    // Attempt Firestore deletes in background
+    try {
+      deleteUserFromCloud(userId);
+      if (user && user.specialistId) {
+        deleteSpecialistFromCloud(user.specialistId);
+      }
+    } catch (error) {
+      console.error("Firestore deleteUser cloud error:", error);
+    }
   };
 
   const cleanProductionDb = async (targetEnv, options, currentUser) => {
@@ -1069,7 +1099,9 @@ export const DataProvider = ({ children }) => {
       updateUser,
       deleteUser,
       cleanProductionDb,
-      logAction
+      logAction,
+      dbMode,
+      setDbMode
     }}>
       {children}
     </DataContext.Provider>

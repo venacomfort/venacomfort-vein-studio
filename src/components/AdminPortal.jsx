@@ -148,7 +148,9 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     updateUser,
     deleteUser,
     cleanProductionDb,
-    logAction
+    logAction,
+    dbMode,
+    setDbMode
   } = useData();
 
   // User management state variables
@@ -892,6 +894,25 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
             />
           </div>
           <div className="flex gap-3 self-start md:self-auto flex-wrap">
+            <div className="flex items-center gap-2 border border-outline-variant bg-soft-ivory/30 px-3 py-2 rounded-xl text-xs font-semibold text-deep-cobalt shadow-sm">
+              <span className="material-symbols-outlined text-base">database</span>
+              <span>{language === 'es' ? 'Base de Datos:' : 'Database:'}</span>
+              <select 
+                value={dbMode} 
+                onChange={(e) => {
+                  setDbMode(e.target.value);
+                  alert(
+                    language === 'es'
+                      ? `Modo de base de datos cambiado a: ${e.target.value === 'local' ? 'Local (Offline)' : 'Nube (Firebase)'}. Por favor, recarga la página para aplicar el cambio.`
+                      : `Database mode changed to: ${e.target.value === 'local' ? 'Local (Offline)' : 'Cloud (Firebase)'}. Please reload the page to apply the change.`
+                  );
+                }}
+                className="bg-transparent border-none text-xs font-bold text-champagne-gold focus:ring-0 cursor-pointer p-0 select-none outline-none focus:outline-none"
+              >
+                <option value="local">Local (Offline)</option>
+                <option value="cloud">Cloud (Firebase)</option>
+              </select>
+            </div>
             <button 
               onClick={handleCleanDb}
               className="border border-error/30 hover:bg-error-container/10 text-error px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
