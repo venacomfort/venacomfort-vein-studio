@@ -204,6 +204,34 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   const [showNotifications, setShowNotifications] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  // Sclerotherapy Consent form input states
+  const [consentInitials, setConsentInitials] = useState({
+    hyperpigmentation: '',
+    matting: '',
+    trappedBlood: '',
+    skinUlceration: '',
+    bloodClots: '',
+    allergicReaction: '',
+    otherRare: '',
+    foamSclero: '',
+    noGuarantee: ''
+  });
+  const [consentMedicalHistory, setConsentMedicalHistory] = useState({
+    dvt: false,
+    clotting: false,
+    pad: false,
+    reaction: false,
+    pregnancy: false,
+    breastfeeding: false,
+    infection: false,
+    mobility: false,
+    migraine: false,
+    pfo: false,
+    anticoagulant: false
+  });
+  const [consentPhotoConsent, setConsentPhotoConsent] = useState(null);
+  const [consentPrintedName, setConsentPrintedName] = useState('');
+
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState(false);
 
@@ -311,6 +339,62 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       setCompareMode(false);
       setIsEditingPatient(false);
       setEditingSoapNoteId(null);
+
+      if (selectedPatient.consentDetails) {
+        setConsentInitials(selectedPatient.consentDetails.initials || {
+          hyperpigmentation: '',
+          matting: '',
+          trappedBlood: '',
+          skinUlceration: '',
+          bloodClots: '',
+          allergicReaction: '',
+          otherRare: '',
+          foamSclero: '',
+          noGuarantee: ''
+        });
+        setConsentMedicalHistory(selectedPatient.consentDetails.medicalHistory || {
+          dvt: false,
+          clotting: false,
+          pad: false,
+          reaction: false,
+          pregnancy: false,
+          breastfeeding: false,
+          infection: false,
+          mobility: false,
+          migraine: false,
+          pfo: false,
+          anticoagulant: false
+        });
+        setConsentPhotoConsent(selectedPatient.consentDetails.photoConsent ?? null);
+        setConsentPrintedName(selectedPatient.consentDetails.printedName || selectedPatient.firstName + ' ' + selectedPatient.lastName);
+      } else {
+        setConsentInitials({
+          hyperpigmentation: '',
+          matting: '',
+          trappedBlood: '',
+          skinUlceration: '',
+          bloodClots: '',
+          allergicReaction: '',
+          otherRare: '',
+          foamSclero: '',
+          noGuarantee: ''
+        });
+        setConsentMedicalHistory({
+          dvt: false,
+          clotting: false,
+          pad: false,
+          reaction: false,
+          pregnancy: false,
+          breastfeeding: false,
+          infection: false,
+          mobility: false,
+          migraine: false,
+          pfo: false,
+          anticoagulant: false
+        });
+        setConsentPhotoConsent(null);
+        setConsentPrintedName(selectedPatient.firstName + ' ' + selectedPatient.lastName);
+      }
     }
   }, [selectedPatientId]);
 
@@ -2086,24 +2170,325 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                             {selectedPatient.consentSigned ? t('signed') : t('unsigned')}
                           </span>
                         </h4>
-                        
-                        <div className="bg-soft-ivory/20 p-4 rounded-xl border border-surface-dim max-h-48 overflow-y-auto text-xs text-on-surface-variant leading-relaxed space-y-2">
-                          <p>{t('sclerotherapyConsentText')}</p>
-                          <p>{t('hipaaConsentText')}</p>
+
+                        <div className="bg-white border border-outline-variant/60 rounded-xl p-4 md:p-6 max-h-[500px] overflow-y-auto text-xs text-on-surface-variant leading-relaxed space-y-6">
+                          <div className="text-center space-y-1">
+                            <h5 className="font-display font-bold text-sm text-deep-cobalt">VENA COMFORT VEIN STUDIO, LLC</h5>
+                            <h6 className="font-display font-bold text-xs text-secondary">INFORMED CONSENT FOR COSMETIC SCLEROTHERAPY</h6>
+                            <h6 className="font-display font-bold text-xs text-secondary">CONSENTIMIENTO INFORMADO PARA ESCLEROTERAPIA COSMÉTICA</h6>
+                          </div>
+
+                          {/* Metadata Fields */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-b border-ice-blue pb-4">
+                            <div>
+                              <p className="font-bold text-deep-cobalt">Patient Name / Nombre del paciente:</p>
+                              <p className="bg-soft-ivory/40 px-2 py-1 rounded mt-1 border border-outline-variant/30">{selectedPatient.firstName} {selectedPatient.lastName}</p>
+                            </div>
+                            <div>
+                              <p className="font-bold text-deep-cobalt">Date of Birth / Fecha de nacimiento:</p>
+                              <p className="bg-soft-ivory/40 px-2 py-1 rounded mt-1 border border-outline-variant/30">{selectedPatient.dob || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="font-bold text-deep-cobalt">Date / Fecha:</p>
+                              <p className="bg-soft-ivory/40 px-2 py-1 rounded mt-1 border border-outline-variant/30">
+                                {selectedPatient.consentSigned 
+                                  ? (selectedPatient.consentDetails?.date || '—') 
+                                  : new Date().toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')
+                                }
+                              </p>
+                            </div>
+                            <div>
+                              <p className="font-bold text-deep-cobalt">Treating Provider / Proveedor:</p>
+                              <p className="bg-soft-ivory/40 px-2 py-1 rounded mt-1 border border-outline-variant/30">Dr. Elena Rodriguez</p>
+                            </div>
+                          </div>
+
+                          {/* 1. PROCEDURE */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">1. PROCEDURE / PROCEDIMIENTO</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>Sclerotherapy is a procedure used to treat appropriate spider veins (telangiectasias), reticular veins, and selected small superficial varicose veins. A sclerosing medication is injected directly into the selected vein. The medication irritates the inner lining of the vein, causing it to close. Over time, the treated vein is gradually absorbed by the body and may become less visible.</p>
+                            <p>I understand that this treatment is being performed primarily for cosmetic purposes unless otherwise documented.</p>
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>La escleroterapia es un procedimiento utilizado para tratar venas de araña (telangiectasias), venas reticulares y ciertas venas varicosas superficiales pequeñas que sean apropiadas para tratamiento. Se inyecta un medicamento esclerosante directamente dentro de la vena seleccionada. El medicamento irrita la capa interna de la vena, provocando su cierre. Con el tiempo, la vena tratada es gradualmente absorbida por el organismo y puede hacerse menos visible.</p>
+                            <p>Entiendo que este tratamiento se realiza principalmente con fines cosméticos, a menos que se documente lo contrario.</p>
+                          </div>
+
+                          {/* 2. EXPECTED RESULTS */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">2. EXPECTED RESULTS AND LIMITATIONS / RESULTADOS ESPERADOS Y LIMITACIONES</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>I understand that:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              <li>Results vary between patients.</li>
+                              <li>Improvement occurs gradually and may take several weeks to months.</li>
+                              <li>More than one treatment session may be necessary.</li>
+                              <li>Complete disappearance of all treated veins cannot be guaranteed.</li>
+                              <li>Some veins may respond only partially or may not respond.</li>
+                              <li>Treated veins may recur or become visible again.</li>
+                              <li>New spider or reticular veins may develop in the future.</li>
+                              <li>Additional treatment may be necessary and may involve additional charges.</li>
+                            </ul>
+                            <p className="font-semibold text-deep-cobalt">No specific cosmetic result has been promised or guaranteed.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Entiendo que:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              <li>Los resultados varían entre pacientes.</li>
+                              <li>La mejoría ocurre gradualmente y puede tomar varias semanas o meses.</li>
+                              <li>Puede ser necesario realizar más de una sesión.</li>
+                              <li>No se puede garantizar la desaparición completa de todas las venas tratadas.</li>
+                              <li>Algunas venas pueden responder parcialmente o no responder al tratamiento.</li>
+                              <li>Las venas tratadas pueden reaparecer o hacerse visibles nuevamente.</li>
+                              <li>Pueden desarrollarse nuevas venas de araña o venas reticulares en el futuro.</li>
+                              <li>Pueden ser necesarios tratamientos adicionales y estos pueden generar cargos adicionales.</li>
+                            </ul>
+                            <p className="font-semibold text-deep-cobalt">No se me ha prometido ni garantizado ningún resultado cosmético específico.</p>
+                          </div>
+
+                          {/* 3. COMMON SIDE EFFECTS */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">3. COMMON SIDE EFFECTS / EFECTOS SECUNDARIOS COMUNES</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>Temporary effects may include burning or stinging during injection, itching, tenderness, redness, bruising, mild swelling, firmness or small lumps along the treated vein, inflammation, and temporary discoloration.</p>
+                            <p>Treated veins may initially appear darker or more noticeable before improving.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Los efectos temporales pueden incluir ardor o sensación de picadura durante la inyección, picazón, sensibilidad, enrojecimiento, moretones, inflamación leve, áreas firmes o pequeños bultos a lo largo de la vena tratada, inflamación y cambios temporales en el color de la piel.</p>
+                            <p>Las venas tratadas pueden inicialmente verse más oscuras o más visibles antes de comenzar a mejorar.</p>
+                          </div>
+
+                          {/* 4. IMPORTANT RISKS */}
+                          <div className="space-y-4">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">4. IMPORTANT RISKS / RIESGOS IMPORTANTES</h6>
+                            <p className="italic text-on-surface-variant/80">Please initial each section after reviewing it / Por favor coloque sus iniciales después de revisar cada sección.</p>
+                            
+                            {/* Risk Items */}
+                            {[
+                              { key: 'hyperpigmentation', title: 'HYPERPIGMENTATION / HIPERPIGMENTACIÓN', en: 'Brown or dark discoloration may develop over or around treated veins. It commonly fades gradually but may remain for several months and, rarely, may persist long-term or permanently.', es: 'Puede desarrollarse una coloración marrón u oscura sobre o alrededor de las venas tratadas. Generalmente desaparece gradualmente, pero puede permanecer durante varios meses y, en raras ocasiones, persistir a largo plazo o permanentemente.' },
+                              { key: 'matting', title: 'TELANGIECTATIC MATTING / MATTING TELANGIECTÁSICO', en: 'Very small red or purple blood vessels may develop near the treated area. These may resolve spontaneously but can persist and may require additional treatment.', es: 'Pueden aparecer vasos sanguíneos muy pequeños de color rojo o morado cerca del área tratada. Estos pueden desaparecer espontáneamente, pero también pueden persistir y requerir tratamiento adicional.' },
+                              { key: 'trappedBlood', title: 'TRAPPED BLOOD / SANGRE ATRAPADA', en: 'Blood may become trapped or coagulated inside a treated vein, producing a dark, firm, tender area or small lump. In some cases, additional evaluation or treatment may be recommended.', es: 'Puede quedar sangre atrapada o coagulada dentro de una vena tratada, produciendo un área oscura, firme, sensible o un pequeño bulto. En algunos casos puede recomendarse evaluación o tratamiento adicional.' },
+                              { key: 'skinUlceration', title: 'SKIN ULCERATION, TISSUE INJURY OR NECROSIS / ÚLCERA, LESIÓN O NECROSIS DE LA PIEL', en: 'Although uncommon, injury to the skin or surrounding tissue may occur, including blistering, ulceration or tissue necrosis. Healing may take time and may result in discoloration or permanent scarring.', es: 'Aunque es poco común, puede ocurrir lesión de la piel o del tejido circundante, incluyendo ampollas, ulceración o necrosis del tejido. La recuperación puede tomar tiempo y puede producir cambios en la pigmentación o cicatrices permanentes.' },
+                              { key: 'bloodClots', title: 'BLOOD CLOTS / COÁGULOS SANGUÍNEOS', en: 'Superficial thrombophlebitis or clotting within treated superficial veins may occur. Deep vein thrombosis (DVT) and pulmonary embolism (PE) are uncommon but potentially serious complications.', es: 'Puede ocurrir tromboflebitis superficial o formación de coágulos dentro de las venas superficiales tratadas. La trombosis venosa profunda (DVT/TVP) y la embolia pulmonar (PE/EP) son complicaciones poco frecuentes pero potencialmente graves.' },
+                              { key: 'allergicReaction', title: 'ALLERGIC REACTION / REACCIÓN ALÉRGICA', en: 'Allergic reactions to the sclerosant are uncommon but may occur. Rarely, a severe allergic or anaphylactic reaction may occur and require emergency medical treatment.', es: 'Las reacciones alérgicas al medicamento esclerosante son poco frecuentes, pero pueden ocurrir. En raras ocasiones puede ocurrir una reacción alérgica grave o anafiláctica que requiera tratamiento médico de emergencia.' },
+                              { key: 'otherRare', title: 'OTHER RARE COMPLICATIONS / OTRAS COMPLICACIONES POCO FRECUENTES', en: 'Other potential complications include infection, nerve irritation or injury, persistent pain, scarring, vasovagal reaction, dizziness or fainting. Inadvertent injection outside the intended vein or into an artery can cause significant tissue injury.', es: 'Otras posibles complicaciones incluyen infección, irritación o lesión de nervios, dolor persistente, cicatrices, reacción vasovagal, mareo o desmayo. La inyección accidental fuera de la vena seleccionada o dentro de una arteria puede causar una lesión significativa del tejido.' },
+                              { key: 'foamSclero', title: 'FOAM SCLEROTHERAPY RISKS, IF USED / RIESGOS DE ESCLEROTERAPIA CON ESPUMA, SI SE UTILIZA', en: 'If foam sclerotherapy is used, temporary visual disturbances, headache or migraine-like symptoms, tingling, or other neurologic symptoms have been reported. Serious neurologic complications are rare but possible.', es: 'Si se utiliza escleroterapia con espuma, se han reportado alteraciones visuales temporales, dolor de cabeza o síntomas similares a migraña, hormigueo u otros síntomas neurológicos. Las complicaciones neurológicas graves son poco frecuentes, pero posibles.' },
+                              { key: 'noGuarantee', title: 'NO GUARANTEE OF RESULTS / NO SE GARANTIZAN LOS RESULTADOS', en: 'I understand that multiple sessions may be necessary and that complete elimination of my veins cannot be guaranteed.', es: 'Entiendo que pueden ser necesarias varias sesiones y que no se puede garantizar la eliminación completa de mis venas.' }
+                            ].map(risk => (
+                              <div key={risk.key} className="p-3 bg-soft-ivory/30 rounded-lg border border-outline-variant/40 flex items-start gap-4">
+                                <div className="shrink-0 flex flex-col items-center">
+                                  <input 
+                                    type="text"
+                                    required
+                                    disabled={selectedPatient.consentSigned}
+                                    maxLength={3}
+                                    value={consentInitials[risk.key] || ''}
+                                    onChange={(e) => setConsentInitials(prev => ({ ...prev, [risk.key]: e.target.value.toUpperCase() }))}
+                                    placeholder="Init"
+                                    className="w-12 text-center font-mono font-bold text-[10px] rounded border-outline-variant text-deep-cobalt focus:ring-1 focus:ring-champagne-gold uppercase py-1 px-0"
+                                  />
+                                  <span className="text-[8px] text-on-surface-variant/70 mt-1 uppercase tracking-wider font-bold">Initials *</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-bold text-deep-cobalt text-[10px]">{risk.title}</p>
+                                  <p className="text-[10px] text-on-surface-variant leading-relaxed"><strong className="text-[9px] uppercase tracking-wider text-secondary">EN:</strong> {risk.en}</p>
+                                  <p className="text-[10px] text-on-surface-variant leading-relaxed"><strong className="text-[9px] uppercase tracking-wider text-secondary">ES:</strong> {risk.es}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* 5. ALTERNATIVES */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">5. ALTERNATIVES / ALTERNATIVAS</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>Depending upon the type of vein and my individual condition, alternatives may include no treatment/observation, compression therapy, conservative management, surface laser/light-based treatment for appropriate vessels, or evaluation for other venous treatments when clinically indicated.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Dependiendo del tipo de vena y de mi condición individual, las alternativas pueden incluir no realizar tratamiento/observación, terapia de compresión, tratamiento conservador, láser superficial u otros tratamientos con luz para vasos apropiados, o evaluación para otros tratamientos venosos cuando estén clínicamente indicados.</p>
+                          </div>
+
+                          {/* 6. COMPRESSION AND AFTERCARE */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">6. COMPRESSION AND AFTERCARE / COMPRESIÓN Y CUIDADOS POSTERIORES</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>I understand that compression stockings or other compression therapy may be recommended following treatment. I agree to follow the post-treatment instructions provided to me regarding compression, walking/activity, exercise, heat exposure, sun exposure, medications, and follow-up.</p>
+                            <p>I understand that following the recommended aftercare is an important part of my treatment.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Entiendo que puede recomendarse el uso de medias de compresión u otra terapia de compresión después del tratamiento. Acepto seguir las instrucciones posteriores al procedimiento relacionadas con compresión, caminar/actividad física, ejercicio, exposición al calor y al sol, medicamentos y seguimiento.</p>
+                            <p>Entiendo que cumplir con los cuidados recomendados después del procedimiento es una parte importante de mi tratamiento.</p>
+                          </div>
+
+                          {/* 7. MEDICAL INFORMATION */}
+                          <div className="space-y-4">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">7. MEDICAL INFORMATION / INFORMACIÓN MÉDICA</h6>
+                            <p className="italic text-on-surface-variant/80">Please check any history of the following / Marcar en caso de tener antecedentes de:</p>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-soft-ivory/20 p-4 rounded-xl border border-outline-variant/40">
+                              {[
+                                { key: 'dvt', labelEn: 'DVT or pulmonary embolism', labelEs: 'DVT/TVP o embolia pulmonar' },
+                                { key: 'clotting', labelEn: 'Blood-clotting disorder', labelEs: 'Trastorno de coagulación' },
+                                { key: 'pad', labelEn: 'Significant peripheral arterial disease', labelEs: 'Enfermedad arterial periférica' },
+                                { key: 'reaction', labelEn: 'Previous reaction/allergy to a sclerosant', labelEs: 'Alergia previa a un esclerosante' },
+                                { key: 'pregnancy', labelEn: 'Pregnancy or possible pregnancy', labelEs: 'Embarazo o posibilidad' },
+                                { key: 'breastfeeding', labelEn: 'Breastfeeding', labelEs: 'Lactancia' },
+                                { key: 'infection', labelEn: 'Active infection or skin infection', labelEs: 'Infección activa o de piel' },
+                                { key: 'mobility', labelEn: 'Significant limitation in mobility', labelEs: 'Limitación de movilidad' },
+                                { key: 'migraine', labelEn: 'Migraine with aura or neurologic symptoms', labelEs: 'Migraña con aura o neurológicos' },
+                                { key: 'pfo', labelEn: 'Known patent foramen ovale (PFO) or cardiac condition', labelEs: 'Foramen oval permeable (PFO)' },
+                                { key: 'anticoagulant', labelEn: 'Anticoagulant or antiplatelet medications', labelEs: 'Anticoagulantes o antiplaquetarios' }
+                              ].map(item => (
+                                <label key={item.key} className="flex items-start gap-2.5 text-xs text-deep-cobalt cursor-pointer">
+                                  <input 
+                                    type="checkbox"
+                                    disabled={selectedPatient.consentSigned}
+                                    checked={consentMedicalHistory[item.key] || false}
+                                    onChange={(e) => setConsentMedicalHistory(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                                    className="rounded border-outline-variant text-champagne-gold focus:ring-champagne-gold mt-0.5"
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold">{item.labelEn}</span>
+                                    <span className="text-[10px] text-on-surface-variant/75 font-medium">{item.labelEs}</span>
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 8. CLINICAL PHOTOGRAPHY */}
+                          <div className="space-y-3">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">8. CLINICAL PHOTOGRAPHY / FOTOGRAFÍA CLÍNICA</h6>
+                            <p className="italic text-on-surface-variant/80">Select one option / Seleccione una opción:</p>
+                            
+                            <div className="space-y-3 bg-soft-ivory/20 p-4 rounded-xl border border-outline-variant/40">
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <input 
+                                  type="radio"
+                                  name="photoConsent"
+                                  disabled={selectedPatient.consentSigned}
+                                  checked={consentPhotoConsent === true}
+                                  onChange={() => setConsentPhotoConsent(true)}
+                                  className="text-champagne-gold focus:ring-champagne-gold mt-0.5"
+                                />
+                                <div className="text-xs text-deep-cobalt flex flex-col">
+                                  <span><strong>I CONSENT / ACEPTO</strong> clinical photographs for my confidential medical record.</span>
+                                  <span className="text-[10px] text-on-surface-variant/75 font-medium mt-0.5">Acepto fotografías clínicas para mi registro médico confidencial.</span>
+                                </div>
+                              </label>
+
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <input 
+                                  type="radio"
+                                  name="photoConsent"
+                                  disabled={selectedPatient.consentSigned}
+                                  checked={consentPhotoConsent === false}
+                                  onChange={() => setConsentPhotoConsent(false)}
+                                  className="text-champagne-gold focus:ring-champagne-gold mt-0.5"
+                                />
+                                <div className="text-xs text-deep-cobalt flex flex-col">
+                                  <span><strong>I DO NOT CONSENT / NO ACEPTO</strong> clinical photographs.</span>
+                                  <span className="text-[10px] text-on-surface-variant/75 font-medium mt-0.5">No acepto fotografías clínicas.</span>
+                                </div>
+                              </label>
+                            </div>
+                            <p className="text-[10px] text-on-surface-variant/80 mt-1">These photographs will not be used for social media, advertising, websites, or other promotional purposes without separate authorization.</p>
+                            <p className="text-[10px] text-on-surface-variant/80">Estas fotografías no serán utilizadas en redes sociales, publicidad, páginas web u otros fines promocionales sin una autorización por separado.</p>
+                          </div>
+
+                          {/* 9. EMERGENCY WARNING SIGNS */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">9. EMERGENCY WARNING SIGNS / SIGNOS DE ALARMA</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>I understand that I should seek prompt medical attention for severe or rapidly worsening pain or swelling, significant skin changes, chest pain, shortness of breath, coughing blood, sudden weakness or numbness, difficulty speaking, significant visual changes, or other severe/unexpected symptoms.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Entiendo que debo buscar atención médica inmediata si presento dolor o inflamación severa o que empeora rápidamente, cambios importantes en la piel, dolor de pecho, dificultad para respirar, tos con sangre, debilidad o entumecimiento repentino, dificultad para hablar, cambios importantes en la visión u otros síntomas severos o inesperados.</p>
+                          </div>
+
+                          {/* 10. INFORMED AND VOLUNTARY CONSENT */}
+                          <div className="space-y-2">
+                            <h6 className="font-bold text-deep-cobalt uppercase border-b border-surface-dim pb-1 text-[11px]">10. INFORMED AND VOLUNTARY CONSENT / CONSENTIMIENTO INFORMADO Y VOLUNTARIO</h6>
+                            <p className="italic font-bold text-[10px] text-secondary">ENGLISH</p>
+                            <p>I acknowledge that the nature and purpose of sclerotherapy, expected benefits, limitations, reasonable alternatives, risks and potential complications have been explained to me. I have had the opportunity to ask questions and my questions have been answered to my satisfaction. I understand that medicine is not an exact science and no particular result has been promised or guaranteed. I understand that I may decline treatment or withdraw my consent before the procedure begins. I voluntarily authorize the treating provider to perform cosmetic sclerotherapy on the treatment areas identified above and to provide reasonable medical care should an unexpected reaction or complication occur.</p>
+                            
+                            <p className="italic font-bold text-[10px] text-secondary mt-2">ESPAÑOL</p>
+                            <p>Reconozco que se me han explicado la naturaleza y el propósito de la escleroterapia, sus beneficios esperados, limitaciones, alternativas razonables, riesgos y posibles complicaciones. He tenido la oportunidad de hacer preguntas y mis preguntas han sido respondidas satisfactoriamente. Entiendo que la medicina no es una ciencia exacta y que no se me ha prometido ni garantizado ningún resultado específico. Entiendo que puedo rechazar el tratamiento o retirar mi consentimiento antes de que comience el procedimiento. Autorizo voluntariamente al proveedor tratante a realizar escleroterapia cosmética en las áreas identificadas anteriormente y a proporcionar atención médica razonable en caso de una reacción o complicación inesperada.</p>
+                          </div>
+
+                          {/* Printed Name Input */}
+                          <div className="space-y-2 pt-3 border-t border-outline-variant/60">
+                            <label className="block text-xs font-bold text-deep-cobalt uppercase">Patient Printed Name / Nombre del paciente *</label>
+                            <input 
+                              type="text"
+                              required
+                              disabled={selectedPatient.consentSigned}
+                              value={consentPrintedName}
+                              onChange={(e) => setConsentPrintedName(e.target.value)}
+                              className="w-full max-w-md text-xs rounded-lg border-outline-variant text-deep-cobalt focus:border-champagne-gold focus:ring-champagne-gold"
+                              placeholder="First and Last Name / Nombre y Apellidos"
+                            />
+                          </div>
                         </div>
 
                         {selectedPatient.consentSigned ? (
-                          <div className="max-w-xs border border-outline-variant bg-white rounded-lg p-2 h-24 flex items-center justify-center shadow-inner mt-4">
-                            <img src={selectedPatient.consentSignatureUrl} alt="Consent Signature" className="max-h-full object-contain" />
+                          <div className="bg-soft-ivory/20 p-4 rounded-xl border border-outline-variant/60 space-y-4">
+                            <p className="text-xs text-on-surface-variant font-bold uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-base">check_circle</span>
+                              {language === 'es' ? 'Documento firmado digitalmente y guardado con éxito' : 'Document digitally signed and successfully recorded'}
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Patient Signature / Firma del paciente:</span>
+                                <div className="border border-outline-variant bg-white rounded-lg p-2 h-24 flex items-center justify-center shadow-inner mt-1 max-w-xs">
+                                  <img src={selectedPatient.consentSignatureUrl} alt="Consent Signature" className="max-h-full object-contain" />
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         ) : (
-                          <div className="space-y-3 pt-3">
-                            <label className="block text-xs font-bold text-deep-cobalt uppercase">Patient Signature Required *</label>
+                          <div className="space-y-3 pt-3 border-t border-ice-blue">
+                            <label className="block text-xs font-bold text-deep-cobalt uppercase">Patient Signature Required / Firma del Paciente Requerida *</label>
                             <ClinicalSignaturePad 
                               initialSignature={null}
                               onSave={(base64) => {
-                                saveConsentSignature(selectedPatientId, base64);
-                                alert('Consent signature registered.');
+                                // Perform validations
+                                const incompleteInitials = Object.entries(consentInitials).some(([k, v]) => !v || v.trim().length === 0);
+                                if (incompleteInitials) {
+                                  alert(language === 'es' 
+                                    ? 'Por favor, introduce tus iniciales en todas las secciones de riesgos antes de firmar.' 
+                                    : 'Please enter your initials in all risk sections before signing.'
+                                  );
+                                  return;
+                                }
+                                if (consentPhotoConsent === null) {
+                                  alert(language === 'es'
+                                    ? 'Por favor, selecciona una opción de consentimiento de fotografía clínica antes de firmar.'
+                                    : 'Please select a clinical photography consent option before signing.'
+                                  );
+                                  return;
+                                }
+                                if (!consentPrintedName || consentPrintedName.trim().length === 0) {
+                                  alert(language === 'es'
+                                    ? 'Por favor, introduce tu nombre completo impreso antes de firmar.'
+                                    : 'Please enter your printed full name before signing.'
+                                  );
+                                  return;
+                                }
+
+                                // Save details
+                                const consentDetails = {
+                                  initials: consentInitials,
+                                  medicalHistory: consentMedicalHistory,
+                                  photoConsent: consentPhotoConsent,
+                                  printedName: consentPrintedName,
+                                  date: new Date().toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US'),
+                                  time: new Date().toLocaleTimeString(language === 'es' ? 'es-ES' : 'en-US')
+                                };
+
+                                saveConsentSignature(selectedPatientId, base64, consentDetails);
+                                logAction(currentUser?.name || 'Admin', 'Consentimiento Firmado', `Consentimiento informado bilingüe para escleroterapia firmado por ${consentPrintedName}`);
+                                alert(language === 'es' ? 'Firma de consentimiento registrada.' : 'Consent signature registered.');
                               }}
                               onClear={() => {}}
                             />

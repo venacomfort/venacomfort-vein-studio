@@ -699,13 +699,14 @@ export const DataProvider = ({ children }) => {
   };
 
   // Save Consent Signature (Escleroterapia)
-  const saveConsentSignature = (patientId, signatureBase64) => {
+  const saveConsentSignature = (patientId, signatureBase64, consentDetails) => {
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
         const updated = {
           ...p,
           consentSigned: true,
-          consentSignatureUrl: signatureBase64
+          consentSignatureUrl: signatureBase64,
+          consentDetails: consentDetails || null
         };
         savePatientToCloud(updated);
         return updated;
