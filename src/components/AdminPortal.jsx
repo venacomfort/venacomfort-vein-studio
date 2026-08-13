@@ -753,7 +753,8 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       filename:     `VenaComfort_Report_${selectedPatient.firstName}_${selectedPatient.lastName}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
     html2pdf().from(element).set(opt).save().then(() => {
@@ -2990,7 +2991,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
 
           {/* Patient Details Grid */}
-          <div className="grid grid-cols-2 gap-6 text-xs bg-white p-4 border border-outline-variant/60 rounded-xl">
+          <div className="grid grid-cols-2 gap-6 text-xs bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <div className="space-y-1.5">
               <p className="font-bold text-deep-cobalt text-[10px] uppercase tracking-wider border-b border-surface-dim pb-0.5">Demographics</p>
               <p><span className="font-semibold">Patient Name:</span> {selectedPatient.firstName} {selectedPatient.lastName}</p>
@@ -3009,7 +3010,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
 
           {/* Intake Medical Answers */}
-          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl">
+          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">Safety Questionnaire Answers</p>
             <div className="grid grid-cols-2 gap-4 text-xs">
               <p><span className="font-semibold">Pregnant/Breastfeeding:</span> <span className={selectedPatient.pregnancy === 'Yes' ? 'text-red-600 font-bold' : ''}>{selectedPatient.pregnancy}</span></p>
@@ -3020,7 +3021,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
 
           {/* Legal photo consent */}
-          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl">
+          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">{t('socialMediaConsent')}</p>
             <p className="text-xs text-on-surface-variant leading-relaxed mb-3">{t('socialConsentText')}</p>
             <div className="flex justify-between items-center">
@@ -3043,7 +3044,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
             <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">Clinical SOAP Notes</p>
             {selectedPatient.soapNotes && selectedPatient.soapNotes.length > 0 ? (
               selectedPatient.soapNotes.map((note, idx) => (
-                <div key={note.id} className="text-xs space-y-2 border-b border-dashed border-surface-dim pb-4 last:border-b-0">
+                <div key={note.id} className="text-xs space-y-2 border-b border-dashed border-surface-dim pb-4 last:border-b-0" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <div className="flex justify-between font-bold text-champagne-gold">
                     <span>Note Date: {note.date}</span>
                     <span>Procedure: {note.procedureType || 'Sclerotherapy'} ({note.objectiveMedication} • {note.objectiveVolume}ml)</span>
@@ -3062,7 +3063,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
 
           {/* Sclerotherapy Informed Consent & Signature Area */}
-          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl page-break-before">
+          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl page-break-before" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">{t('digitalConsent')}</p>
             <p className="text-[10px] text-on-surface-variant leading-relaxed">
               {t('sclerotherapyConsentText')}
