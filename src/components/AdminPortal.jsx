@@ -3063,7 +3063,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
 
           {/* Sclerotherapy Informed Consent & Signature Area */}
-          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl page-break-before" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'always', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">{t('digitalConsent')}</p>
             <p className="text-[10px] text-on-surface-variant leading-relaxed">
               {t('sclerotherapyConsentText')}

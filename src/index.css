@@ -86,3 +86,14 @@ html, body {
 h1, h2, h3, .font-display {
   font-family: 'Playfair Display', Georgia, serif;
 }
+
+/* Page break rules for PDF generation */
+.page-break-before {
+  page-break-before: always;
+  break-before: always;
+}
+
+.page-break-inside-avoid {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
