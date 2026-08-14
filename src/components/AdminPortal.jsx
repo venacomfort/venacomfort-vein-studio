@@ -782,34 +782,27 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   };
   // Native browser print / Save as PDF (100% vector, crisp text, zero distortion)
   const handlePrintPDF = () => {
-    const element = document.getElementById('printable-report-area');
-    if (!element || !selectedPatient) return;
-    element.style.display = 'block';
+    if (!selectedPatient) return;
     window.print();
-    element.style.display = 'none';
     logAction(currentUser?.name || 'Admin', 'Expediente Impr/PDF', `Impresión/PDF procesado para ${selectedPatient.firstName} ${selectedPatient.lastName}`);
   };
-  // PDF Generation using native jsPDF & html2canvas with attached DOM anchor for reliable Chrome download
+
+  // PDF Generation using native jsPDF & html2canvas
   const exportPDF = async () => {
     const element = document.getElementById('printable-report-area');
     if (!element || !selectedPatient) return;
 
-    // Show temporary print container off-screen with fixed width for A4 high-res rendering
-    element.style.position = 'fixed';
-    element.style.left = '0';
-    element.style.top = '0';
-    element.style.width = '794px';
-    element.style.zIndex = '999999';
-    element.style.background = '#ffffff';
-    element.style.display = 'block';
-    element.style.visibility = 'visible';
+    const originalStyle = element.getAttribute('style') || '';
 
-    // Allow DOM layout and wait for images to render
+    // Show temporary print container behind main layout for A4 canvas capture
+    element.style.cssText = 'display: block !important; position: fixed !important; left: 0 !important; top: 0 !important; width: 794px !important; z-index: -9999 !important; background: #ffffff !important; visibility: visible !important;';
+
+    // Allow DOM layout and wait for images to decode
     await new Promise(resolve => setTimeout(resolve, 300));
     const images = Array.from(element.querySelectorAll('img'));
     await Promise.all(
       images.map(img => {
-        if (img.complete) return Promise.resolve();
+        if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
         return new Promise(resolve => {
           img.onload = resolve;
           img.onerror = resolve;
@@ -822,10 +815,11 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        windowWidth: 794
       });
 
-      element.style.display = 'none';
+      element.setAttribute('style', originalStyle);
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -852,22 +846,16 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
         heightLeft -= pageHeightMM;
       }
 
-      // Output as Data URI string for 100% direct binary file download (bypasses Chrome Blob GUID links)
-      const dataUri = pdf.output('datauristring');
       const safePatientName = `${selectedPatient.firstName || 'Paciente'}_${selectedPatient.lastName || ''}`.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `VenaComfort_Historial_Clinico_${safePatientName}.pdf`;
 
-      const link = document.createElement('a');
-      link.href = dataUri;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Trigger standard PDF save
+      pdf.save(filename);
 
       logAction(currentUser?.name || 'Admin', 'Expediente Exportado', `PDF descargado para ${selectedPatient.firstName} ${selectedPatient.lastName}`);
     } catch (err) {
       console.error('PDF Export failed:', err);
-      element.style.display = 'none';
+      element.setAttribute('style', originalStyle);
       alert(language === 'es' ? 'Error al generar el documento PDF.' : 'Error generating PDF document.');
     }
   };
