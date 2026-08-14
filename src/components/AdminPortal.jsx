@@ -5,10 +5,11 @@ import { useData } from '../context/DataContext';
 
 // Custom Canvas Signature Pad Component
 function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
+  const [strokeCount, setStrokeCount] = useState(0); // tracks how many strokes drawn
 
   useEffect(() => {
     if (initialSignature) return;
@@ -20,6 +21,7 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
     ctx.lineCap = 'round';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSigned(false);
+    setStrokeCount(0);
   }, [initialSignature]);
 
   const getCoordinates = (e) => {
@@ -63,12 +65,11 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
 
   const stopDrawing = () => {
     if (initialSignature) return;
-    setIsDrawing(false);
-    if (hasSigned) {
-      const canvas = canvasRef.current;
-      const base64 = canvas.toDataURL('image/png');
-      onSave(base64);
+    if (isDrawing) {
+      setStrokeCount(prev => prev + 1); // count completed stroke
     }
+    setIsDrawing(false);
+    // DO NOT auto-save here — user must click Confirm button
   };
 
   const clear = () => {
@@ -77,7 +78,15 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSigned(false);
+    setStrokeCount(0);
     onClear();
+  };
+
+  const confirmSignature = () => {
+    if (!hasSigned || strokeCount < 2) return; // require at least 2 strokes
+    const canvas = canvasRef.current;
+    const base64 = canvas.toDataURL('image/png');
+    onSave(base64);
   };
 
   return (
@@ -90,7 +99,7 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
           </span>
         </div>
       ) : (
-        <div className="border border-outline-variant bg-white rounded-lg p-2">
+        <div className="border border-outline-variant bg-white rounded-lg p-2 space-y-2">
           <canvas
             ref={canvasRef}
             width={500}
@@ -104,10 +113,19 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
             onTouchEnd={stopDrawing}
             className="w-full h-24 bg-soft-ivory/20 rounded cursor-crosshair border border-dashed border-outline-variant/60"
           />
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-[10px] text-on-surface-variant font-medium">
-              {t('language') === 'es' ? 'Firme dentro del cuadro' : 'Sign inside the box'}
-            </span>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              {hasSigned && strokeCount < 2 && (
+                <span className="text-[10px] text-amber-600 font-semibold">
+                  {language === 'es' ? 'Continúa firmando...' : 'Keep signing...'}
+                </span>
+              )}
+              {!hasSigned && (
+                <span className="text-[10px] text-on-surface-variant font-medium">
+                  {language === 'es' ? 'Firme dentro del cuadro' : 'Sign inside the box'}
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={clear}
@@ -116,6 +134,22 @@ function ClinicalSignaturePad({ onSave, onClear, initialSignature }) {
               {t('clearSignature')}
             </button>
           </div>
+          {/* Explicit confirm button — only enabled after sufficient strokes */}
+          <button
+            type="button"
+            disabled={!hasSigned || strokeCount < 2}
+            onClick={confirmSignature}
+            className={`w-full py-2.5 rounded-xl font-bold text-sm tracking-wide transition-all ${
+              hasSigned && strokeCount >= 2
+                ? 'bg-deep-cobalt text-white hover:bg-deep-cobalt/90 shadow-md cursor-pointer'
+                : 'bg-surface-dim text-on-surface-variant/50 cursor-not-allowed opacity-60'
+            }`}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-base">draw</span>
+              {language === 'es' ? 'Confirmar Firma' : 'Confirm Signature'}
+            </span>
+          </button>
         </div>
       )}
     </div>
@@ -750,21 +784,32 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     const element = document.getElementById('printable-report-area');
     if (!element) return;
 
-    // Show temporary print container
-    element.classList.remove('hidden');
+    // Show temporary print container off-screen so html2canvas renders layout, styles and images accurately
+    element.style.position = 'fixed';
+    element.style.left = '0';
+    element.style.top = '0';
+    element.style.width = '800px';
+    element.style.zIndex = '99999';
+    element.style.background = '#ffffff';
+    element.style.display = 'block';
+    element.style.visibility = 'visible';
 
+    const patientName = `${selectedPatient.firstName || ''}_${selectedPatient.lastName || ''}`.replace(/\s+/g, '_');
     const opt = {
-      margin:       10,
-      filename:     `VenaComfort_Report_${selectedPatient.firstName}_${selectedPatient.lastName}.pdf`,
+      margin:       [10, 10, 10, 10],
+      filename:     `VenaComfort_Historial_Clinico_${patientName}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
     };
 
     html2pdf().from(element).set(opt).save().then(() => {
-      // Hide back print container
-      element.classList.add('hidden');
+      element.style.display = 'none';
+    }).catch((err) => {
+      console.error('PDF Export failed:', err);
+      element.style.display = 'none';
+      alert(language === 'es' ? 'Error al descargar PDF.' : 'Failed to download PDF.');
     });
   };
 
@@ -2933,123 +2978,194 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
 
       {/* PDF PRINT DESIGN AREA (HIDDEN FROM VIEWPORT, USED ONLY FOR html2pdf EXPORT) */}
       {selectedPatient && (
-        <div id="printable-report-area" className="hidden p-10 bg-white text-deep-cobalt space-y-8 font-sans max-w-[800px] leading-relaxed">
+        <div id="printable-report-area" style={{ display: 'none', width: '800px', backgroundColor: '#ffffff', color: '#0A2540', padding: '30px', fontFamily: 'sans-serif', lineHeight: '1.6' }} className="space-y-6">
           {/* Letterhead Header */}
-          <div className="flex justify-between items-center border-b-2 border-champagne-gold pb-6">
-            <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="VenaComfort Logo" className="h-10 w-10 object-contain" />
+          <div className="flex justify-between items-center pb-4" style={{ borderBottom: '2px solid #C5A880' }}>
+            <div className="flex items-center gap-3">
+              <img src="/logo.png" alt="VenaComfort Logo" className="h-12 w-12 object-contain" />
               <div>
-                <h1 className="font-display text-3xl font-bold tracking-tight text-deep-cobalt">VenaComfort</h1>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-champagne-gold">Vein Studio & Aesthetic Care</span>
+                <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#0A2540' }}>VenaComfort</h1>
+                <span className="text-[10px] uppercase font-bold tracking-widest" style={{ color: '#C5A880' }}>Vein Studio & Aesthetic Care</span>
               </div>
             </div>
-            <div className="text-right text-[10px] text-on-surface-variant font-medium">
+            <div className="text-right text-[10px] font-medium" style={{ color: '#4A5568' }}>
               <p>786-531-0664 | info@venacomfort.com</p>
               <p>Serving Miami-Dade & South Florida</p>
-              <p className="font-bold text-deep-cobalt mt-1">HIPAA COMPLIANT MEDICAL RECORD</p>
+              <p className="font-bold mt-1" style={{ color: '#0A2540' }}>EXPEDIENTE CLÍNICO REGLAMENTARIO HIPAA</p>
             </div>
           </div>
 
-          {/* Document Title */}
-          <div className="text-center bg-soft-ivory p-3 rounded-lg border border-champagne-gold/10">
-            <h2 className="font-display text-xl font-bold text-deep-cobalt uppercase tracking-wide">Patient Clinical File & Signed Consents</h2>
-            <p className="text-[10px] text-on-surface-variant uppercase font-semibold mt-0.5">Generated on {new Date().toLocaleDateString()}</p>
+          {/* Document Title Banner */}
+          <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#F8F6F0', border: '1px solid #E5E0D8' }}>
+            <h2 className="text-lg font-bold uppercase tracking-wide" style={{ color: '#0A2540' }}>Resumen Clínico Completo e Historial del Paciente</h2>
+            <p className="text-[10px] uppercase font-semibold mt-0.5" style={{ color: '#718096' }}>Fecha de generación: {new Date().toLocaleDateString()} @ {new Date().toLocaleTimeString()}</p>
           </div>
 
-          {/* Patient Details Grid */}
-          <div className="grid grid-cols-2 gap-6 text-xs bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+          {/* 1. Demographics & Emergency Contact */}
+          <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-xl" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             <div className="space-y-1.5">
-              <p className="font-bold text-deep-cobalt text-[10px] uppercase tracking-wider border-b border-surface-dim pb-0.5">Demographics</p>
-              <p><span className="font-semibold">Patient Name:</span> {selectedPatient.firstName} {selectedPatient.lastName}</p>
-              <p><span className="font-semibold">DOB:</span> {selectedPatient.dob} ({selectedPatient.gender})</p>
-              <p><span className="font-semibold">Email:</span> {selectedPatient.email}</p>
-              <p><span className="font-semibold">Phone:</span> {selectedPatient.phone}</p>
-              <p><span className="font-semibold">Address:</span> {selectedPatient.address || 'N/A'}</p>
+              <p className="font-bold text-[10px] uppercase tracking-wider pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Datos Demográficos</p>
+              <p><span className="font-semibold">Nombre:</span> {selectedPatient.firstName} {selectedPatient.lastName}</p>
+              <p><span className="font-semibold">Fecha Nacimiento:</span> {selectedPatient.dob} ({selectedPatient.gender})</p>
+              <p><span className="font-semibold">Correo:</span> {selectedPatient.email}</p>
+              <p><span className="font-semibold">Teléfono:</span> {selectedPatient.phone}</p>
+              <p><span className="font-semibold">Dirección:</span> {selectedPatient.address || 'N/A'}</p>
             </div>
             <div className="space-y-1.5">
-              <p className="font-bold text-deep-cobalt text-[10px] uppercase tracking-wider border-b border-surface-dim pb-0.5">Emergency Contact</p>
-              <p><span className="font-semibold">Name:</span> {selectedPatient.emergName || 'N/A'}</p>
-              <p><span className="font-semibold">Phone:</span> {selectedPatient.emergPhone || 'N/A'}</p>
-              <p className="font-bold text-deep-cobalt text-[10px] uppercase tracking-wider border-b border-surface-dim pb-0.5 mt-2">Vascular Concerns</p>
-              <p className="italic text-on-surface-variant">{selectedPatient.concerns || 'None reported'}</p>
+              <p className="font-bold text-[10px] uppercase tracking-wider pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Contacto de Emergencia</p>
+              <p><span className="font-semibold">Nombre:</span> {selectedPatient.emergName || 'N/A'}</p>
+              <p><span className="font-semibold">Teléfono:</span> {selectedPatient.emergPhone || 'N/A'}</p>
+              <p className="font-bold text-[10px] uppercase tracking-wider pb-1 mt-2" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Motivo de Consulta Vascular</p>
+              <p className="italic" style={{ color: '#4A5568' }}>{selectedPatient.concerns || 'Ninguno reportado'}</p>
             </div>
           </div>
 
-          {/* Intake Medical Answers */}
-          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">Safety Questionnaire Answers</p>
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <p><span className="font-semibold">Pregnant/Breastfeeding:</span> <span className={selectedPatient.pregnancy === 'Yes' ? 'text-red-600 font-bold' : ''}>{selectedPatient.pregnancy}</span></p>
-              <p><span className="font-semibold">Blood Clots/DVT History:</span> <span className={selectedPatient.clotsHistory === 'Yes' ? 'text-amber-600 font-bold' : ''}>{selectedPatient.clotsHistory}</span></p>
-              <p><span className="font-semibold">Allergies (latex/sclerosants):</span> <span className="font-semibold">{selectedPatient.allergiesHistory}</span> {selectedPatient.allergiesHistoryDetail && `(${selectedPatient.allergiesHistoryDetail})`}</p>
-              <p><span className="font-semibold">Previous Vein Procedures:</span> <span className="font-semibold">{selectedPatient.prevVeinTreatments}</span> {selectedPatient.prevVeinTreatmentsDetail && `(${selectedPatient.prevVeinTreatmentsDetail})`}</p>
+          {/* 2. Safety Questionnaire Answers */}
+          <div className="space-y-2 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Cuestionario de Seguridad e Ingreso</p>
+            <div className="grid grid-cols-2 gap-3">
+              <p><span className="font-semibold">Embarazo/Lactancia:</span> <span className={selectedPatient.pregnancy === 'Yes' ? 'font-bold text-red-600' : ''}>{selectedPatient.pregnancy === 'Yes' ? 'Sí' : 'No'}</span></p>
+              <p><span className="font-semibold">Antecedentes de Coágulos/TVP:</span> <span className={selectedPatient.clotsHistory === 'Yes' ? 'font-bold text-amber-600' : ''}>{selectedPatient.clotsHistory === 'Yes' ? 'Sí' : 'No'}</span></p>
+              <p><span className="font-semibold">Alergias (látex/esclerosantes):</span> <span>{selectedPatient.allergiesHistory || 'No'}</span> {selectedPatient.allergiesHistoryDetail && `(${selectedPatient.allergiesHistoryDetail})`}</p>
+              <p><span className="font-semibold">Procedimientos Venosos Previos:</span> <span>{selectedPatient.prevVeinTreatments || 'No'}</span> {selectedPatient.prevVeinTreatmentsDetail && `(${selectedPatient.prevVeinTreatmentsDetail})`}</p>
             </div>
           </div>
 
-          {/* Legal photo consent */}
-          <div className="space-y-3 bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">{t('socialMediaConsent')}</p>
-            <p className="text-xs text-on-surface-variant leading-relaxed mb-3">{t('socialConsentText')}</p>
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-deep-cobalt">
-                Selected level: {
-                  selectedPatient.socialMediaConsentLevel === 'level1' ? 'Clinical records only' :
-                  selectedPatient.socialMediaConsentLevel === 'level2' ? 'Anonymous marketing' : 'Full public use'
-                }
-              </span>
-              {selectedPatient.socialMediaConsentSigned && (
-                <div className="w-40 border border-outline-variant rounded p-1 h-12 flex items-center justify-center bg-white shadow-inner">
-                  <img src={selectedPatient.socialMediaSignatureUrl} alt="Social Signature" className="max-h-full object-contain" />
-                </div>
-              )}
-            </div>
+          {/* 3. Complete Appointment History */}
+          <div className="space-y-3 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Historial Completo de Citas</p>
+            {selectedPatient.appointments && selectedPatient.appointments.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#718096', fontSize: '10px', textTransform: 'uppercase' }}>
+                    <th className="py-1">Fecha / Hora</th>
+                    <th className="py-1">Tratamiento / Servicio</th>
+                    <th className="py-1">Especialista</th>
+                    <th className="py-1 text-right">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPatient.appointments.map((app) => (
+                    <tr key={app.id} style={{ borderBottom: '1px border-dashed #EDF2F7' }}>
+                      <td className="py-2 font-semibold" style={{ color: '#0A2540' }}>{app.date} @ {app.time}</td>
+                      <td className="py-2">{app.service}</td>
+                      <td className="py-2">{app.doctor}</td>
+                      <td className="py-2 text-right font-bold uppercase text-[9px]">
+                        {app.status === 'completed' && <span style={{ color: '#059669' }}>Atendido / Presente</span>}
+                        {app.status === 'confirmed' && <span style={{ color: '#2563EB' }}>Confirmado</span>}
+                        {app.status === 'no_show' && <span style={{ color: '#DC2626' }}>No se presentó</span>}
+                        {(app.status === 'pending_confirmation' || !app.status) && <span style={{ color: '#D97706' }}>Pendiente</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="italic text-[11px]" style={{ color: '#718096' }}>No hay registros de citas anteriores.</p>
+            )}
           </div>
 
-          {/* SOAP Clinical note list */}
-          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl">
-            <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">Clinical SOAP Notes</p>
-            {selectedPatient.soapNotes && selectedPatient.soapNotes.length > 0 ? (
-              selectedPatient.soapNotes.map((note, idx) => (
-                <div key={note.id} className="text-xs space-y-2 border-b border-dashed border-surface-dim pb-4 last:border-b-0" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <div className="flex justify-between font-bold text-champagne-gold">
-                    <span>Note Date: {note.date}</span>
-                    <span>Procedure: {note.procedureType || 'Sclerotherapy'} ({note.objectiveMedication} • {note.objectiveVolume}ml)</span>
+          {/* 4. Signed Consents Status */}
+          <div className="space-y-3 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Estado de Consentimientos Informados</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="font-bold text-[11px]" style={{ color: '#0A2540' }}>1. Consentimiento de Escleroterapia:</p>
+                <p className="font-semibold">
+                  Estado: {selectedPatient.consentSigned ? (
+                    <span style={{ color: '#059669', fontWeight: 'bold' }}>✓ FIRMADO</span>
+                  ) : (
+                    <span style={{ color: '#DC2626', fontWeight: 'bold' }}>✗ NO FIRMADO</span>
+                  )}
+                </p>
+                {selectedPatient.consentSigned && selectedPatient.consentDetails && (
+                  <div className="text-[10px] space-y-0.5" style={{ color: '#4A5568' }}>
+                    <p>Nombre impreso: {selectedPatient.consentDetails.printedName}</p>
+                    <p>Fecha de firma: {selectedPatient.consentDetails.date} @ {selectedPatient.consentDetails.time}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <p><span className="font-semibold text-deep-cobalt">Subjective:</span> {note.subjective}</p>
-                    <p><span className="font-semibold text-deep-cobalt">Objective Notes:</span> {note.objectiveNotes}</p>
-                    <p><span className="font-semibold text-deep-cobalt">Assessment:</span> {note.assessment}</p>
-                    <p><span className="font-semibold text-deep-cobalt">Plan:</span> {note.plan}</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-[11px]" style={{ color: '#0A2540' }}>2. Consentimiento de Foto / Redes Sociales:</p>
+                <p className="font-semibold">
+                  Estado: {selectedPatient.socialMediaConsentSigned ? (
+                    <span style={{ color: '#059669', fontWeight: 'bold' }}>✓ FIRMADO</span>
+                  ) : (
+                    <span style={{ color: '#D97706', fontWeight: 'bold' }}>PENDIENTE</span>
+                  )}
+                </p>
+                <p className="text-[10px]" style={{ color: '#4A5568' }}>
+                  Nivel autorizado: {
+                    selectedPatient.socialMediaConsentLevel === 'level1' ? 'Solo registro clínico confidencial' :
+                    selectedPatient.socialMediaConsentLevel === 'level2' ? 'Uso promocional anónimo' : 'Uso promocional completo'
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. SOAP Clinical Notes History */}
+          <div className="space-y-4 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff' }}>
+            <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Notas Clínicas SOAP</p>
+            {selectedPatient.soapNotes && selectedPatient.soapNotes.length > 0 ? (
+              selectedPatient.soapNotes.map((note) => (
+                <div key={note.id} className="space-y-2 pb-3" style={{ borderBottom: '1px dashed #E2E8F0', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                  <div className="flex justify-between font-bold text-[11px]" style={{ color: '#C5A880' }}>
+                    <span>Fecha: {note.date}</span>
+                    <span>Procedimiento: {note.procedureType || 'Escleroterapia'} ({note.objectiveMedication} • {note.objectiveVolume}ml)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-[11px]">
+                    <p><span className="font-semibold" style={{ color: '#0A2540' }}>Subjetivo:</span> {note.subjective}</p>
+                    <p><span className="font-semibold" style={{ color: '#0A2540' }}>Notas Objetivas:</span> {note.objectiveNotes}</p>
+                    <p><span className="font-semibold" style={{ color: '#0A2540' }}>Evaluación:</span> {note.assessment}</p>
+                    <p><span className="font-semibold" style={{ color: '#0A2540' }}>Plan:</span> {note.plan}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-xs text-on-surface-variant italic">No clinical SOAP notes recorded yet.</p>
+              <p className="italic text-[11px]" style={{ color: '#718096' }}>No hay notas clínicas SOAP registradas aún.</p>
             )}
           </div>
 
-          {/* Sclerotherapy Informed Consent & Signature Area */}
-          <div className="html2pdf__page-break"></div>
-          <div className="space-y-4 bg-white p-4 border border-outline-variant/60 rounded-xl" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            <p className="font-bold text-deep-cobalt text-xs uppercase tracking-wide border-b border-surface-dim pb-1">{t('digitalConsent')}</p>
-            <p className="text-[10px] text-on-surface-variant leading-relaxed">
-              {t('sclerotherapyConsentText')}
-            </p>
-            
-            <div className="flex justify-between items-end pt-6">
-              <div className="space-y-2">
-                <span className="block text-[9px] uppercase font-bold text-on-surface-variant">Attending Doctor</span>
-                <div className="border-b border-deep-cobalt w-48 text-xs font-semibold py-1">Dr. Elena Rodriguez, MD</div>
+          {/* 6. Clinical Progress Photos Gallery (If Any) */}
+          {selectedPatient.photos && selectedPatient.photos.length > 0 && (
+            <div className="space-y-3 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+              <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Galería de Evolución Clínica / Fotografías</p>
+              <div className="grid grid-cols-3 gap-3">
+                {selectedPatient.photos.map((photo) => (
+                  <div key={photo.id} className="p-2 text-center rounded" style={{ border: '1px solid #E2E8F0', backgroundColor: '#F8F6F0' }}>
+                    <div className="h-28 w-full flex items-center justify-center overflow-hidden rounded bg-white mb-1">
+                      <img src={photo.url} alt={photo.label} className="max-h-full max-w-full object-contain" />
+                    </div>
+                    <p className="font-bold text-[10px]" style={{ color: '#0A2540' }}>{photo.label}</p>
+                    <p className="text-[9px]" style={{ color: '#718096' }}>{photo.date}</p>
+                  </div>
+                ))}
               </div>
-              <div className="space-y-2 flex flex-col items-center">
-                <span className="block text-[9px] uppercase font-bold text-on-surface-variant align-left self-start">Patient Signature</span>
-                {selectedPatient.consentSigned ? (
-                  <div className="w-48 border border-outline-variant rounded p-1 h-14 flex items-center justify-center bg-white shadow-inner">
-                    <img src={selectedPatient.consentSignatureUrl} alt="Patient Signature" className="max-h-full object-contain" />
+            </div>
+          )}
+
+          {/* 7. Signatures & Medical Verification Block */}
+          <div className="html2pdf__page-break"></div>
+          <div className="space-y-4 p-4 rounded-xl text-xs" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            <p className="font-bold text-xs uppercase tracking-wide pb-1" style={{ color: '#0A2540', borderBottom: '1px solid #EDF2F7' }}>Firma Digital y Verificación del Expediente</p>
+            
+            <div className="grid grid-cols-2 gap-8 pt-4 items-end">
+              <div className="space-y-2 text-center">
+                <span className="block text-[9px] uppercase font-bold" style={{ color: '#718096' }}>Médico Tratante</span>
+                <div className="py-2 font-bold text-sm" style={{ borderBottom: '1px solid #0A2540', color: '#0A2540' }}>Dr. Elena Rodriguez, MD</div>
+                <span className="block text-[9px]" style={{ color: '#718096' }}>VenaComfort Vein Studio & Aesthetic Care</span>
+              </div>
+              <div className="space-y-2 text-center">
+                <span className="block text-[9px] uppercase font-bold" style={{ color: '#718096' }}>Firma del Paciente</span>
+                {selectedPatient.consentSigned && selectedPatient.consentSignatureUrl ? (
+                  <div className="h-16 flex items-center justify-center p-1 rounded" style={{ border: '1px solid #E2E8F0', backgroundColor: '#ffffff' }}>
+                    <img src={selectedPatient.consentSignatureUrl} alt="Firma del Paciente" className="max-h-full object-contain" />
                   </div>
                 ) : (
-                  <div className="border-b border-deep-cobalt w-48 text-xs font-semibold py-4 text-center text-error font-bold uppercase tracking-wide">Consent Unsigned</div>
+                  <div className="py-4 text-center font-bold uppercase text-red-500" style={{ borderBottom: '1px solid #0A2540' }}>Consentimiento No Firmado</div>
                 )}
+                <span className="block text-[9px]" style={{ color: '#718096' }}>{selectedPatient.firstName} {selectedPatient.lastName}</span>
               </div>
             </div>
           </div>
