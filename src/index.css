@@ -97,3 +97,30 @@ h1, h2, h3, .font-display {
   page-break-inside: avoid;
   break-inside: avoid;
 }
+
+/* Print styles for native Save as PDF & Print dialog */
+@media print {
+  body > * {
+    display: none !important;
+  }
+  #printable-report-area {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #ffffff !important;
+    color: #0A2540 !important;
+    visibility: visible !important;
+    box-shadow: none !important;
+  }
+  #printable-report-area * {
+    visibility: visible !important;
+  }
+  .html2pdf__page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+}

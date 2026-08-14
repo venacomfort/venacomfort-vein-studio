@@ -780,7 +780,15 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       return [...prev, photoId];
     });
   };
-
+  // Native browser print / Save as PDF (100% vector, crisp text, zero distortion)
+  const handlePrintPDF = () => {
+    const element = document.getElementById('printable-report-area');
+    if (!element || !selectedPatient) return;
+    element.style.display = 'block';
+    window.print();
+    element.style.display = 'none';
+    logAction(currentUser?.name || 'Admin', 'Expediente Impr/PDF', `Impresión/PDF procesado para ${selectedPatient.firstName} ${selectedPatient.lastName}`);
+  };
   // PDF Generation using native jsPDF & html2canvas with attached DOM anchor for reliable Chrome download
   const exportPDF = async () => {
     const element = document.getElementById('printable-report-area');
@@ -844,23 +852,19 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
         heightLeft -= pageHeightMM;
       }
 
-      // Generate Blob & forced DOM attached download to prevent Chrome saving GUID blob names
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
+      // Output as Data URI string for 100% direct binary file download (bypasses Chrome Blob GUID links)
+      const dataUri = pdf.output('datauristring');
       const safePatientName = `${selectedPatient.firstName || 'Paciente'}_${selectedPatient.lastName || ''}`.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `VenaComfort_Historial_Clinico_${safePatientName}.pdf`;
 
       const link = document.createElement('a');
-      link.href = blobUrl;
+      link.href = dataUri;
       link.download = filename;
-      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-
-      logAction(currentUser?.name || 'Admin', 'Expediente Exportado', `PDF generado para el paciente ${selectedPatient.firstName} ${selectedPatient.lastName}`);
+      logAction(currentUser?.name || 'Admin', 'Expediente Exportado', `PDF descargado para ${selectedPatient.firstName} ${selectedPatient.lastName}`);
     } catch (err) {
       console.error('PDF Export failed:', err);
       element.style.display = 'none';
@@ -2809,13 +2813,23 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                         Genera un informe médico membretado de alta fidelidad que unifica la ficha de admisión, los consentimientos legales firmados por el paciente, las notas SOAP de procedimiento y la firma digital.
                       </p>
 
-                      <button
-                        onClick={exportPDF}
-                        className="bg-champagne-gold text-white font-semibold text-xs tracking-wider uppercase px-8 py-3 rounded-lg hover:brightness-110 shadow-md cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <span className="material-symbols-outlined text-sm">download</span>
-                        Download Clinical PDF
-                      </button>
+                      <div className="flex flex-wrap justify-center gap-3 max-w-lg mx-auto pt-2">
+                        <button
+                          onClick={handlePrintPDF}
+                          className="bg-deep-cobalt text-white font-bold text-xs tracking-wider uppercase px-6 py-3 rounded-xl hover:bg-deep-cobalt/90 shadow-md cursor-pointer inline-flex items-center gap-2 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-base">print</span>
+                          {language === 'es' ? 'Imprimir / Guardar como PDF' : 'Print / Save as PDF'}
+                        </button>
+
+                        <button
+                          onClick={exportPDF}
+                          className="bg-champagne-gold text-white font-bold text-xs tracking-wider uppercase px-6 py-3 rounded-xl hover:brightness-110 shadow-md cursor-pointer inline-flex items-center gap-2 transition-all"
+                        >
+                          <span className="material-symbols-outlined text-base">download</span>
+                          {language === 'es' ? 'Descargar Archivo PDF' : 'Download PDF File'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
