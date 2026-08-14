@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
 
@@ -779,38 +781,68 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     });
   };
 
-  // PDF Generation with html2pdf
-  const exportPDF = () => {
+  // PDF Generation using native jsPDF & html2canvas (zero CDN dependencies, guaranteed PDF binary & custom filename)
+  const exportPDF = async () => {
     const element = document.getElementById('printable-report-area');
-    if (!element) return;
+    if (!element || !selectedPatient) return;
 
-    // Show temporary print container off-screen so html2canvas renders layout, styles and images accurately
+    // Show temporary print container off-screen with fixed width for A4 high-res rendering
     element.style.position = 'fixed';
     element.style.left = '0';
     element.style.top = '0';
-    element.style.width = '800px';
-    element.style.zIndex = '99999';
+    element.style.width = '794px';
+    element.style.zIndex = '999999';
     element.style.background = '#ffffff';
     element.style.display = 'block';
     element.style.visibility = 'visible';
 
-    const patientName = `${selectedPatient.firstName || ''}_${selectedPatient.lastName || ''}`.replace(/\s+/g, '_');
-    const opt = {
-      margin:       [10, 10, 10, 10],
-      filename:     `VenaComfort_Historial_Clinico_${patientName}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, letterRendering: true, logging: false },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    // Allow DOM layout and images to render
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    html2pdf().from(element).set(opt).save().then(() => {
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
       element.style.display = 'none';
-    }).catch((err) => {
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+      const margin = 10;
+      const contentWidth = pdfWidth - margin * 2; // 190mm
+      const pageHeightMM = pdfHeight - margin * 2; // 277mm
+      
+      const imgHeightMM = (canvas.height * contentWidth) / canvas.width;
+
+      let heightLeft = imgHeightMM;
+      let position = margin;
+
+      // Add first page
+      pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeightMM);
+      heightLeft -= pageHeightMM;
+
+      // Add subsequent pages if content exceeds single page height
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeightMM + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeightMM);
+        heightLeft -= pageHeightMM;
+      }
+
+      const safePatientName = `${selectedPatient.firstName || 'Paciente'}_${selectedPatient.lastName || ''}`.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      pdf.save(`VenaComfort_Historial_Clinico_${safePatientName}.pdf`);
+
+      logAction(currentUser?.name || 'Admin', 'Expediente Exportado', `PDF generado para el paciente ${selectedPatient.firstName} ${selectedPatient.lastName}`);
+    } catch (err) {
       console.error('PDF Export failed:', err);
       element.style.display = 'none';
-      alert(language === 'es' ? 'Error al descargar PDF.' : 'Failed to download PDF.');
-    });
+      alert(language === 'es' ? 'Error al generar el documento PDF.' : 'Error generating PDF document.');
+    }
   };
 
   // LOGIN SCREEN RENDER
