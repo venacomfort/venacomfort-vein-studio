@@ -3701,8 +3701,8 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
       )}
 
       {/* CLEAN DB MODAL */}
-      {showCleanDbModal && (
-        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+      {showCleanDbModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-primary/45 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
           <div className="w-full max-w-md bg-soft-ivory rounded-3xl overflow-hidden shadow-2xl border border-error/20 flex flex-col max-h-[90vh]">
             <header className="bg-white px-6 py-4 border-b border-error/15 flex justify-between items-center shrink-0">
               <span className="font-display text-lg font-bold text-error flex items-center gap-2">
@@ -3861,7 +3861,8 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
               </footer>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
     {deleteConfirm && ReactDOM.createPortal(

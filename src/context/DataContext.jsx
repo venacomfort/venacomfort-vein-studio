@@ -155,7 +155,13 @@ const initialPatients = [
   }
 ];
 
-const isProd = import.meta.env.PROD || window.location.hostname !== 'localhost';
+const isLocalDev = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname.includes('192.168.') ||
+  window.location.hostname.includes('.local')
+);
+const isProd = !isLocalDev;
 const COLL_PATIENTS = isProd ? "patients" : "patients_dev";
 const COLL_APPOINTMENTS = isProd ? "appointments" : "appointments_dev";
 const COLL_SPECIALISTS = isProd ? "specialists" : "specialists_dev";
@@ -757,20 +763,22 @@ export const DataProvider = ({ children }) => {
     }));
   };
 
-  // Upload Patient Photo (Antes/Después)
+  // Upload Patient Photo (Antes/Después) - Persisted to Cloud Firestore permanently
   const uploadPatientPhoto = (patientId, base64Data, label) => {
     const newPhoto = {
       id: `photo-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
       label,
+      url: base64Data,
       base64Data
     };
 
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
+        const currentPhotos = Array.isArray(p.photos) ? p.photos : [];
         const updated = {
           ...p,
-          photos: [...p.photos, newPhoto]
+          photos: [...currentPhotos, newPhoto]
         };
         savePatientToCloud(updated);
         return updated;
@@ -1008,9 +1016,7 @@ export const DataProvider = ({ children }) => {
   const cleanProductionDb = async (targetEnv, options, currentUser) => {
     try {
       const targetPrefix = targetEnv === 'prod' ? '' : '_dev';
-      const isActiveDev = window.location.hostname.includes('localhost') || window.location.hostname.includes('127.0.0.1');
-      const activePrefix = isActiveDev ? '_dev' : '';
-      const isTargetActive = targetPrefix === activePrefix;
+      const isTargetActive = (targetEnv === 'prod' && isProd) || (targetEnv === 'dev' && !isProd);
 
       // 1. Clean Specialists
       if (options.specialists) {
@@ -1018,6 +1024,7 @@ export const DataProvider = ({ children }) => {
         for (const d of specSnap.docs) {
           await deleteDoc(doc(db, `specialists${targetPrefix}`, d.id));
         }
+        localStorage.removeItem(targetEnv === 'prod' ? 'venacomfort_specialists' : 'venacomfort_specialists_dev');
         if (isTargetActive) {
           setSpecialists([]);
         }
@@ -1033,8 +1040,9 @@ export const DataProvider = ({ children }) => {
           }
           await deleteDoc(doc(db, `users${targetPrefix}`, d.id));
         }
+        localStorage.removeItem(targetEnv === 'prod' ? 'venacomfort_users' : 'venacomfort_users_dev');
         if (isTargetActive) {
-          setUsers(users.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
+          setUsers(prev => prev.filter(u => u.email?.toLowerCase() === 'admin@venacomfort.com'));
         }
       }
 
@@ -1044,6 +1052,7 @@ export const DataProvider = ({ children }) => {
         for (const d of patSnap.docs) {
           await deleteDoc(doc(db, `patients${targetPrefix}`, d.id));
         }
+        localStorage.removeItem(targetEnv === 'prod' ? 'venacomfort_patients' : 'venacomfort_patients_dev');
         if (isTargetActive) {
           setPatients([]);
         }
@@ -1055,6 +1064,7 @@ export const DataProvider = ({ children }) => {
         for (const d of appSnap.docs) {
           await deleteDoc(doc(db, `appointments${targetPrefix}`, d.id));
         }
+        localStorage.removeItem(targetEnv === 'prod' ? 'venacomfort_appointments' : 'venacomfort_appointments_dev');
         if (isTargetActive) {
           setAppointments([]);
         }
