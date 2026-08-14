@@ -781,7 +781,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     });
   };
 
-  // PDF Generation using native jsPDF & html2canvas (zero CDN dependencies, guaranteed PDF binary & custom filename)
+  // PDF Generation using native jsPDF & html2canvas with attached DOM anchor for reliable Chrome download
   const exportPDF = async () => {
     const element = document.getElementById('printable-report-area');
     if (!element || !selectedPatient) return;
@@ -796,8 +796,18 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
     element.style.display = 'block';
     element.style.visibility = 'visible';
 
-    // Allow DOM layout and images to render
+    // Allow DOM layout and wait for images to render
     await new Promise(resolve => setTimeout(resolve, 300));
+    const images = Array.from(element.querySelectorAll('img'));
+    await Promise.all(
+      images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
 
     try {
       const canvas = await html2canvas(element, {
@@ -834,8 +844,21 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
         heightLeft -= pageHeightMM;
       }
 
+      // Generate Blob & forced DOM attached download to prevent Chrome saving GUID blob names
+      const pdfBlob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
       const safePatientName = `${selectedPatient.firstName || 'Paciente'}_${selectedPatient.lastName || ''}`.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-      pdf.save(`VenaComfort_Historial_Clinico_${safePatientName}.pdf`);
+      const filename = `VenaComfort_Historial_Clinico_${safePatientName}.pdf`;
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
       logAction(currentUser?.name || 'Admin', 'Expediente Exportado', `PDF generado para el paciente ${selectedPatient.firstName} ${selectedPatient.lastName}`);
     } catch (err) {
