@@ -2801,21 +2801,13 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                         Genera un informe médico membretado de alta fidelidad que unifica la ficha de admisión, los consentimientos legales firmados por el paciente, las notas SOAP de procedimiento y la firma digital.
                       </p>
 
-                      <div className="flex flex-wrap justify-center gap-3 max-w-lg mx-auto pt-2">
+                      <div className="flex justify-center pt-2">
                         <button
                           onClick={handlePrintPDF}
-                          className="bg-deep-cobalt text-white font-bold text-xs tracking-wider uppercase px-6 py-3 rounded-xl hover:bg-deep-cobalt/90 shadow-md cursor-pointer inline-flex items-center gap-2 transition-all"
+                          className="bg-deep-cobalt text-white font-bold text-xs tracking-wider uppercase px-8 py-3.5 rounded-xl hover:bg-deep-cobalt/90 shadow-lg cursor-pointer inline-flex items-center gap-2.5 transition-all"
                         >
-                          <span className="material-symbols-outlined text-base">print</span>
+                          <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
                           {language === 'es' ? 'Imprimir / Guardar como PDF' : 'Print / Save as PDF'}
-                        </button>
-
-                        <button
-                          onClick={exportPDF}
-                          className="bg-champagne-gold text-white font-bold text-xs tracking-wider uppercase px-6 py-3 rounded-xl hover:brightness-110 shadow-md cursor-pointer inline-flex items-center gap-2 transition-all"
-                        >
-                          <span className="material-symbols-outlined text-base">download</span>
-                          {language === 'es' ? 'Descargar Archivo PDF' : 'Download PDF File'}
                         </button>
                       </div>
                     </div>
