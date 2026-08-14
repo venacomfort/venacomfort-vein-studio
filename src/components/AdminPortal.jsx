@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
 
@@ -1234,6 +1235,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
   };
 
   return (
+    <>
     <div className="flex-grow flex flex-col h-full overflow-hidden bg-background relative">
       {/* Toast popup */}
       {toastMessage && (
@@ -3696,63 +3698,60 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
           </div>
         </div>
       )}
-      {/* ── Delete Confirmation Modal ── */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl border border-error/20 p-8 max-w-sm w-full mx-4 animate-fade-in">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <div className="w-14 h-14 rounded-full bg-error/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-error text-3xl">delete_forever</span>
-              </div>
-              <div>
-                <p className="font-bold text-on-surface text-base mb-1">
-                  {language === 'es' ? '¿Eliminar permanentemente?' : 'Permanently delete?'}
-                </p>
-                <p className="text-on-surface-variant text-sm">
-                  {language === 'es'
-                    ? `Esta acción eliminará a `
-                    : `This will permanently remove `}
-                  <span className="font-bold text-on-surface">{deleteConfirm.name}</span>
-                  {language === 'es'
-                    ? ` de forma irreversible. ¿Continuar?`
-                    : ` and cannot be undone. Continue?`}
-                </p>
-              </div>
-              <div className="flex gap-3 w-full pt-2">
-                <button
-                  type="button"
-                  onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 border border-outline-variant text-on-surface-variant hover:bg-outline-variant/10 px-4 py-2.5 rounded-xl font-semibold text-sm cursor-pointer transition-colors"
-                >
-                  {language === 'es' ? 'Cancelar' : 'Cancel'}
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const { type, id, name } = deleteConfirm;
-                    setDeleteConfirm(null);
-                    try {
-                      if (type === 'user') {
-                        await deleteUser(id);
-                        logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta eliminada: ${name}`);
-                      } else {
-                        await deleteSpecialist(id);
-                        logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista eliminado: ${name}`);
-                      }
-                    } catch (err) {
-                      console.error('Delete error:', err);
+    </div>
+    {deleteConfirm && ReactDOM.createPortal(
+      <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm" style={{ zIndex: 9999 }}>
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4" style={{ border: '1px solid #fca5a5' }}>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: '#fef2f2' }}>
+              <span className="material-symbols-outlined text-3xl" style={{ color: '#dc2626' }}>delete_forever</span>
+            </div>
+            <div>
+              <p className="font-bold text-base mb-1" style={{ color: '#111827' }}>
+                {language === 'es' ? '¿Eliminar permanentemente?' : 'Permanently delete?'}
+              </p>
+              <p className="text-sm" style={{ color: '#6b7280' }}>
+                {language === 'es' ? 'Esta acción eliminará a ' : 'This will permanently remove '}
+                <span className="font-bold" style={{ color: '#111827' }}>{deleteConfirm.name}</span>
+                {language === 'es' ? ' de forma irreversible.' : ' and cannot be undone.'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', width: '100%', paddingTop: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirm(null)}
+                style={{ flex: 1, border: '1px solid #d1d5db', padding: '10px 16px', borderRadius: '12px', fontWeight: '600', fontSize: '14px', cursor: 'pointer', background: 'white', color: '#374151' }}
+              >
+                {language === 'es' ? 'Cancelar' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const { type, id, name } = deleteConfirm;
+                  setDeleteConfirm(null);
+                  try {
+                    if (type === 'user') {
+                      await deleteUser(id);
+                      logAction(currentUser?.name || 'Admin', 'Usuario Eliminado', `Cuenta eliminada: ${name}`);
+                    } else {
+                      await deleteSpecialist(id);
+                      logAction(currentUser?.name || 'Admin', 'Especialista Eliminado', `Especialista eliminado: ${name}`);
                     }
-                  }}
-                  className="flex-1 bg-error text-white hover:bg-error/90 px-4 py-2.5 rounded-xl font-bold text-sm cursor-pointer transition-colors shadow-md"
-                >
-                  {language === 'es' ? 'Sí, eliminar' : 'Yes, delete'}
-                </button>
-              </div>
+                  } catch (err) {
+                    console.error('Delete error:', err);
+                  }
+                }}
+                style={{ flex: 1, background: '#dc2626', color: 'white', padding: '10px 16px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', border: 'none' }}
+              >
+                {language === 'es' ? 'Sí, eliminar' : 'Yes, delete'}
+              </button>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 
 }
