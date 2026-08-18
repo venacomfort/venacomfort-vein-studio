@@ -1238,6 +1238,10 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                 <img 
                   src={spec.image || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=200'} 
                   alt={spec.name} 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(spec.name)}&background=0A2540&color=ffffff`;
+                  }}
                   className="w-16 h-16 rounded-full object-cover border border-champagne-gold/30 shrink-0" 
                 />
                 <div className="space-y-1">

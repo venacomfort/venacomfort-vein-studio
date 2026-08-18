@@ -376,7 +376,15 @@ export default function BookingWizard({ onClose, initialService }) {
                       <div className={`p-4 border rounded-xl hover:border-champagne-gold transition-all flex items-center gap-4 ${
                         booking.doctor === doc.name ? 'border-champagne-gold bg-champagne-gold/5 shadow-sm' : 'border-outline-variant bg-white/70'
                       }`}>
-                        <img src={doc.image} alt={doc.name} className="w-12 h-12 rounded-full object-cover border border-champagne-gold/30" />
+                        <img 
+                          src={doc.image && doc.image.startsWith('http') ? doc.image : 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300'} 
+                          alt={doc.name} 
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doc.name)}&background=0A2540&color=ffffff`;
+                          }}
+                          className="w-12 h-12 rounded-full object-cover border border-champagne-gold/30 shrink-0" 
+                        />
                         <div>
                           <span className="font-semibold text-sm text-deep-cobalt block">{doc.name}</span>
                           <span className="text-xs text-on-surface-variant">

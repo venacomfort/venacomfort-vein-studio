@@ -14,7 +14,7 @@ const defaultSpecialists = [
     phone: '786-555-0190',
     schedule: 'Mon - Fri',
     scheduleEs: 'Lun - Vie',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmFlvCGywaT-W4-dIbbWMP8IqY3-KNASyMcjp4sn_v17Te9vY81ut7cojgvOOAQtLpF-Gy4REDJOZk1PpiZEnyM-s7JeTIBqUhjnzzy4HaqUUtt_Cla9djQ62nuF3dJQ804xhNJi-dTU_TtcMwfFyo9kqsHe_RdugDAUTG_tVecvEHi25aa4G3cL6v97p3kHjEdBSXXbfu2uSyjn8f0lO5A5CFpFOTGvaqtDsqRG--U9h9Gt8OlN1JRA',
+    image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300',
     status: 'Active'
   }
 ];
