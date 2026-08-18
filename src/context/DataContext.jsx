@@ -1014,9 +1014,17 @@ export const DataProvider = ({ children }) => {
   };
 
   const cleanProductionDb = async (targetEnv, options, currentUser) => {
+    if (targetEnv === 'prod') {
+      throw new Error(
+        window.location.hostname.includes('es') || true
+          ? '🚨 ACCESO DENEGADO: La base de datos de PRODUCCIÓN está protegida y no se puede borrar ningún dato de ella.'
+          : '🚨 ACCESS DENIED: Production database is protected and cannot be cleared.'
+      );
+    }
+
     try {
-      const targetPrefix = targetEnv === 'prod' ? '' : '_dev';
-      const isTargetActive = (targetEnv === 'prod' && isProd) || (targetEnv === 'dev' && !isProd);
+      const targetPrefix = '_dev';
+      const isTargetActive = !isProd;
 
       // 1. Clean Specialists
       if (options.specialists) {

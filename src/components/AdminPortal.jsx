@@ -3739,11 +3739,7 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                   <button
                     type="button"
                     onClick={() => setCleanDbTarget('dev')}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
-                      cleanDbTarget === 'dev'
-                        ? 'border-champagne-gold bg-soft-ivory/50 ring-1 ring-champagne-gold'
-                        : 'border-outline-variant/60 hover:bg-white/40'
-                    }`}
+                    className="p-4 rounded-xl border text-left cursor-pointer transition-all border-champagne-gold bg-soft-ivory/50 ring-1 ring-champagne-gold"
                   >
                     <span className="block font-bold text-xs text-deep-cobalt">
                       {language === 'es' ? 'Desarrollo' : 'Development'}
@@ -3752,22 +3748,15 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                       _dev collections
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setCleanDbTarget('prod')}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all ${
-                      cleanDbTarget === 'prod'
-                        ? 'border-error bg-error-container/5 ring-1 ring-error'
-                        : 'border-outline-variant/60 hover:bg-white/40'
-                    }`}
-                  >
-                    <span className="block font-bold text-xs text-error">
-                      {language === 'es' ? 'Producción' : 'Production'}
+                  <div className="p-4 rounded-xl border text-left bg-surface-dim/40 border-outline-variant/30 opacity-75 relative cursor-not-allowed">
+                    <span className="block font-bold text-xs text-outline flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">lock</span>
+                      {language === 'es' ? 'Producción (Protegida)' : 'Production (Protected)'}
                     </span>
-                    <span className="block text-[10px] text-outline mt-1 font-mono">
-                      Live collections
+                    <span className="block text-[9px] text-error font-semibold mt-1">
+                      {language === 'es' ? 'Bloqueada contra borrados' : 'Locked against deletions'}
                     </span>
-                  </button>
+                  </div>
                 </div>
               </div>
 
@@ -3829,14 +3818,14 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
               <div className="space-y-2">
                 <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
                   {language === 'es' 
-                    ? `Para confirmar, escribe "${cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}"` 
-                    : `To confirm, type "${cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}"`
+                    ? 'Para confirmar la limpieza de desarrollo, escribe "ELIMINAR DESARROLLO"' 
+                    : 'To confirm development cleanup, type "ELIMINAR DESARROLLO"'
                   } *
                 </label>
                 <input 
                   type="text"
                   required
-                  placeholder={cleanDbTarget === 'prod' ? 'ELIMINAR PRODUCCION' : 'ELIMINAR DESARROLLO'}
+                  placeholder="ELIMINAR DESARROLLO"
                   value={cleanDbConfirmText}
                   onChange={(e) => setCleanDbConfirmText(e.target.value)}
                   className="w-full text-xs rounded-lg border-outline-variant text-deep-cobalt uppercase font-mono focus:border-error focus:ring-1 focus:ring-error"
