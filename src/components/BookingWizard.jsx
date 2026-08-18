@@ -110,13 +110,10 @@ export default function BookingWizard({ onClose, initialService }) {
   const [step, setStep] = useState(1);
   const [booking, setBooking] = useState(() => {
     const servicesList = [
-      { id: 'Sclerotherapy', price: 300 },
-      { id: 'Spider Vein', price: 250 },
-      { id: 'Reticular Veins', price: 500 },
-      { id: 'Vascular Eval', price: 100 }
+      { id: 'Sclerotherapy', price: 300 }
     ];
-    const defaultSvcId = initialService || 'Sclerotherapy';
-    const svc = servicesList.find(s => s.id === defaultSvcId) || servicesList[0];
+    const defaultSvcId = 'Sclerotherapy';
+    const svc = servicesList[0];
     return {
       service: svc.id,
       doctor: 'Dr. Elena Rodriguez',
@@ -334,10 +331,7 @@ export default function BookingWizard({ onClose, initialService }) {
                     {t('ourTreatments')}
                   </h3>
                   {[
-                    { id: 'Sclerotherapy', name: 'Sclerotherapy', nameEs: 'Escleroterapia', price: 300, desc: 'Gold standard injection' },
-                    { id: 'Spider Vein', name: 'Spider Vein Treatment', nameEs: 'Tratamiento de Arañas', price: 250, desc: 'Aesthetic clearing' },
-                    { id: 'Reticular Veins', name: 'Reticular Veins Treatment', nameEs: 'Venas Reticulares', price: 500, desc: 'Feeder veins ablation' },
-                    { id: 'Vascular Eval', name: 'Vascular Evaluation', nameEs: 'Evaluación Vascular', price: 100, desc: 'Full diagnostic check' }
+                    { id: 'Sclerotherapy', name: 'Sclerotherapy', nameEs: 'Escleroterapia', price: 300, desc: 'Gold standard injection' }
                   ].map((s) => (
                     <label key={s.id} className="block cursor-pointer">
                       <input 

@@ -2948,9 +2948,6 @@ export default function AdminPortal({ adminSubView = 'patients', setAdminSubView
                                 className="w-full rounded-lg border-outline-variant text-xs text-deep-cobalt"
                               >
                                 <option value="Sclerotherapy">Sclerotherapy</option>
-                                <option value="Spider Vein">Spider Vein Laser</option>
-                                <option value="Reticular Veins">Reticular Veins Treatment</option>
-                                <option value="Vascular Eval">Vascular Evaluation</option>
                               </select>
                             </div>
 
